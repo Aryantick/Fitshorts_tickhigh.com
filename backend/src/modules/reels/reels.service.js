@@ -2,7 +2,7 @@ const S3Client = require("../../integrations/s3/s3.client");
 const ReelsRepository = require("./reels.repository");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
-
+const MusicService = require("../music/music.service")
 async function getUploadUrl(userId, fileExtension) {
   try {
     const result = await S3Client.generateUploadUrl(userId, fileExtension);
@@ -13,15 +13,26 @@ async function getUploadUrl(userId, fileExtension) {
   }
 }
 
-async function createReel(userId, title, description, rawS3Key, category) {
+async function createReel(userId, title, description, rawS3Key, category, musicId) {
   try {
+
     const result = await ReelsRepository.createReel(
       userId,
       title,
       description,
       rawS3Key,
       category,
+      musicId
     );
+
+    if (musicId) {
+      try {
+        await MusicService.incrementUsageCount(musicId)
+      } catch (musicerror) {
+        console.error("faild to increment music usage count", musicerror.message)
+        throw error
+      }
+    }
     return {
       reelId: result.insertId,
       status: "pending_review",

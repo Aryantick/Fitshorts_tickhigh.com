@@ -1,25 +1,26 @@
 const pool = require("../../config/db.config");
 
-async function createNotification(userId, ReeLId, type, message) {
-  const { result } = await pool.query(
-    "INSERT INTO notifaction (user_id, reel_id, type, message) VALUES (?, ?, ? ,?)"[
-      (userId, ReeLId, type, message)
-    ],
+async function createNotification(userId, reelId, type, message) {
+  const [result] = await pool.query(
+    "INSERT INTO notifications (user_id, reel_id, type, message) VALUES (?, ?, ?, ?)",
+    [userId, reelId, type, message],
   );
   return result;
 }
+
 
 async function findNotificationsByUserId(userId) {
   const [rows] = await pool.query(
     "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC",
     [userId],
   );
+  return rows;
 }
 
-async function markAsRead(notifactionid) {
+async function markAsRead(notificationId, userId) {
   const [result] = await pool.query(
-    "UPDATE notifications  SET is_read WHERE id = ? ",
-    [notifactionid],
+    "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+    [notificationId, userId],
   );
   return result;
 }
