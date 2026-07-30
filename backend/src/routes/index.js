@@ -10,6 +10,7 @@ const unsubscribe =  require("../modules/authOtp/authOtp.router")
 const Reelurl =  require("../modules/reels/reels.router")
 const AdminRouter =  require("../modules/admin/admin.router")
 const notificationRouter = require("../modules/notifications/notifications.router");
+const musicRouter = require("../modules/music/music.router");
 
 router.use(subscriptionRoutes);
 router.use(selectPlanRoutes);
@@ -22,4 +23,5 @@ router.use(unsubscribe)
 router.use(Reelurl)
 router.use(AdminRouter)
 router.use(notificationRouter)
-module.exports = router;
+router.use(musicRouter)
+module.exports = router;3

@@ -6,6 +6,8 @@ const S3Client = require("../../integrations/s3/s3.client");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { pool } = require("../../config/db.config");
+const NotifactionService = require("../notifications/notifications.service")
+const ReelRepository = require("../reels/reels.repository")
 
 async function loginAdmin(identifier, password) {
   try {
@@ -73,6 +75,8 @@ async function createModerator(username, email, password) {
     throw error;
   }
 }
+
+//getPendingReels
 async function getPendingReels() {
   try {
     const result = await AdminRepository.findPendingReels();
@@ -101,28 +105,81 @@ async function getPendingReels() {
 }
 
 
-
-async function approveReel(id,adminId) {
+//approveReel
+async function approveReel(id, adminId) {
   try {
-    const result =  await AdminRepository.approveReel(id, adminId)
-    return result
+    const reel = await ReelRepository.findReelById(id);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
+
+    const result = await AdminRepository.approveReel(id, adminId);
+
+    try {
+      await NotifactionService.createNotification(
+        reel.user_id,
+        id,
+        "reel_approved",
+        `Your reel ${reel.title} has been approved and is now live`,
+      );
+    } catch (notificationError) {
+      console.error("Failed to send reel approval notification", notificationError);
+    }
+
+    return result;
   } catch (error) {
-    console.log("approve reel", error.message)
+    console.error("approveReel error:", error.message);
+    throw error;
   }
 }
+
 async function rejectedReel(id, adminId, reason) {
   try {
+    const reel = await ReelRepository.findReelById(id);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
+
     const result = await AdminRepository.rejectReel(id, adminId, reason);
+
+    try {
+      await NotifactionService.createNotification(
+        reel.user_id,
+        id,
+        "reel_rejected",
+        `Your reel ${reel.title} was rejected. Reason: ${reason}`,
+      );
+    } catch (notificationError) {
+      console.error("Failed to send reel rejected notification", notificationError);
+    }
+
     return result;
   } catch (error) {
     console.log("rejected reel", error.message);
-    throw error;   
+    throw error;
   }
 }
 
 async function deleteReel(id, adminId, reason) {
   try {
+    const reel = await ReelRepository.findReelById(id);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
+
     const result = await AdminRepository.deleteReel(id, adminId, reason);
+
+    try {
+      await NotifactionService.createNotification(
+        reel.user_id,
+        id,
+        "reel_deleted",
+        `Your reel ${reel.title} was deleted. Reason: ${reason}`,
+      );
+    } catch (notificationError) {
+      console.error("Failed to send reel deleted notification", notificationError);
+    }
+
     return result;
   } catch (error) {
     console.error("deleteReel error:", error.message);
@@ -135,7 +192,7 @@ module.exports = {
   loginAdmin,
   createModerator,
   getPendingReels,
-  approveReel, 
+  approveReel,
   rejectedReel,
   deleteReel
 };

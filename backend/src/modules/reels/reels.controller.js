@@ -16,7 +16,7 @@ async function getUploadUrl(req, res) {
 }
 
 async function uploadReel(req, res) {
-  const { title, description, rawS3Key, category } = req.body;
+  const { title, description, rawS3Key, category, musicId } = req.body;
   const userId = req.user.userId;
   if (!title || !rawS3Key) {
     return apiResponse(res, 400, "Title & rawS3key is required");
@@ -28,6 +28,7 @@ async function uploadReel(req, res) {
       description,
       rawS3Key,
       category,
+      musicId
     );
 
     return apiResponse(res, 200, "Reel created successfully", result);

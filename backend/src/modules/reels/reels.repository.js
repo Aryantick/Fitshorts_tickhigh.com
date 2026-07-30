@@ -22,7 +22,7 @@ async function findReelById(id) {
 }
 
 async function deleteReelById(id) {
-  const [result] = await pool.query("DELETE FROM reels WHERE id = ?", [id]); // ✅ fixed: DLETE -> DELETE, added missing comma
+  const [result] = await pool.query("DELETE FROM reels WHERE id = ?", [id]);
 
   return result;
 }
