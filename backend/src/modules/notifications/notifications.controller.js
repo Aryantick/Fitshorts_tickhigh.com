@@ -19,7 +19,8 @@ async function getMyNotifications(req, res) {
 async function markNotificationAsRead(req, res) {
   try {
     const { id } = req.params;
-    const result = await NotificationService.markNotificationAsRead(id);
+    const userId = req.user.userId;
+    const result = await NotificationService.markNotificationAsRead(id, userId);
     return apiResponse(res, 200, "Notification marked as read", result);
   } catch (error) {
     return apiResponse(res, 400, error.message, error);

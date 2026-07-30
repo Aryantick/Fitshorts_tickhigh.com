@@ -25,9 +25,12 @@ async function getByNotifacition(userId) {
   }
 }
 
-async function markNotificationAsRead(notifactionid) {
+async function markNotificationAsRead(notificationId, userId) {
   try {
-    const result = await NotifactionRep.markAsRead(notifactionid);
+    const result = await NotifactionRep.markAsRead(notificationId, userId);
+    if (result.affectedRows === 0) {
+      throw new Error("Notification not found or you are not authorized to update it");
+    }
     return result;
   } catch (error) {
     console.error("markbynotifaction error", error.message);

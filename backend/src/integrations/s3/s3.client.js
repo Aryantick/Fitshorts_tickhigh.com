@@ -27,8 +27,26 @@ async function generateUploadUrl(userId, fileExtension) {
   return { uploadUrl, key };
 }
 
+
+async function generateAudioUrl(adminId, fileExtension) {
+  const key = `music/${adminId}/${uuidv4()}.${fileExtension}`;
+
+  const command = new PutObjectCommand({
+    Bucket: s3Config.bucketName,
+    Key: key,
+    ContentType: `audio/${fileExtension}`,
+  });
+
+  const uploadUrl = await getSignedUrl(s3Client, command, {
+    expiresIn: 1200,
+  });
+
+  return { uploadUrl, key };
+}
+
 module.exports = {
   s3Client,
   bucketName: s3Config.bucketName,
   generateUploadUrl,
+  generateAudioUrl
 };
