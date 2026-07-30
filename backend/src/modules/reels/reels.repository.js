@@ -117,6 +117,23 @@ async function findReelsByUserId(userId) {
   return rows;
 }
 
+
+async function updateTranscodingResult(reelId, { thumbS3Key, hlsS3Key, status }) {
+  const [result] = await pool.query(
+    "UPDATE reels SET thumb_s3_key = ?, hls_s3_key = ?, transcoding_status = ? WHERE id = ?",
+    [thumbS3Key, hlsS3Key, status, reelId],
+  );
+  return result;
+}
+
+async function updateCounts(reelId, viewsCount, likesCount) {
+  const [result] = await pool.query(
+    "UPDATE reels SET view_count = ?, like_count = ? WHERE id = ?",
+    [viewsCount, likesCount, reelId],
+  );
+  return result;
+}
+
 module.exports = {
   createReel,
   findFeedReels,
@@ -129,5 +146,7 @@ module.exports = {
   addView,
   incrementViewCount,
   updateReelMetadata,
-  findReelsByUserId
+  findReelsByUserId,
+  updateTranscodingResult,
+  updateCounts,
 };
