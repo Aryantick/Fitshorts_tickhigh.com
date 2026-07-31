@@ -1,9 +1,10 @@
 const pool = require("../../config/db.config");
+const { REEL_STATUS } = require("../../constants/enums");
 
 async function createReel(userId, title, description, rawS3Key, category) {
   const [result] = await pool.query(
     "INSERT INTO reels (user_id, title, description, raw_s3_key, category, status) VALUES (?,?,?,?,?,?)",
-    [userId, title, description, rawS3Key, category, "pending_review"],
+    [userId, title, description, rawS3Key, category, REEL_STATUS.PENDING_REVIEW],
   );
   console.log("RAW queryResult:", result);
   return result;
@@ -11,10 +12,12 @@ async function createReel(userId, title, description, rawS3Key, category) {
 
 async function findFeedReels() {
   const [rows] = await pool.query(
-    'SELECT * FROM reels WHERE status = "published" ORDER BY created_at DESC',
+    "SELECT * FROM reels WHERE status = ? ORDER BY created_at DESC",
+    [REEL_STATUS.PUBLISHED],
   );
   return rows;
 }
+
 
 async function findReelById(id) {
   const [rows] = await pool.query("SELECT * FROM reels WHERE id = ?", [id]);

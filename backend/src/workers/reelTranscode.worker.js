@@ -4,6 +4,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const reelTranscodeQueue = require("../queues/reelTranscode.queue");
 const S3Client = require("../integrations/s3/s3.client");
 const ReelsRepository = require("../modules/reels/reels.repository");
+const { TRANSCODING_STATUS } = require("../constants/enums");
 
 const TEMP_DIR = path.join(__dirname, "../../temp");
 
@@ -45,7 +46,7 @@ reelTranscodeQueue.process(async (job) => {
     await ReelsRepository.updateTranscodingResult(reelId, {
       thumbS3Key,
       hlsS3Key,
-      status: "completed",
+      status: TRANSCODING_STATUS.COMPLETED,
     });
 
     console.log(`Reel ${reelId} processed successfully!`);
@@ -54,7 +55,7 @@ reelTranscodeQueue.process(async (job) => {
     await ReelsRepository.updateTranscodingResult(reelId, {
       thumbS3Key: null,
       hlsS3Key: null,
-      status: "failed",
+      status: TRANSCODING_STATUS.FAILED,
     });
   } finally {
     // Cleanup local temp files
@@ -62,6 +63,7 @@ reelTranscodeQueue.process(async (job) => {
     cleanupFolder(hlsOutputDir);
   }
 });
+
 
 function generateThumbnail(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
