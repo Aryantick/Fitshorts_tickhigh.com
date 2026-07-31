@@ -1,4 +1,5 @@
 const pool = require("../../config/db.config");
+const { REEL_STATUS } = require("../../constants/enums");
 
 async function findAdminByUsernameOrEmail(identifier) {
   const [rows] = await pool.query(
@@ -19,31 +20,32 @@ async function CreatedAdmins(username, email, passwordHash, role) {
 
 async function findPendingReels() {
   const [rows] = await pool.query(
-    'SELECT * FROM reels WHERE status = "pending_review" ORDER BY created_at ASC',
+    "SELECT * FROM reels WHERE status = ? ORDER BY created_at ASC",
+    [REEL_STATUS.PENDING_REVIEW],
   ); // show old reel first
   return rows;
 }
 
 async function approveReel(id, adminId) {
   const [result] = await pool.query(
-    'UPDATE reels SET status = "published", reviewed_by = ?, reviewed_at = NOW() WHERE id = ?',
-    [adminId, id],
+    "UPDATE reels SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?",
+    [REEL_STATUS.PUBLISHED, adminId, id],
   );
   return result;
 }
 
 async function rejectReel(id, adminId, reason) {
   const [result] = await pool.query(
-    'UPDATE reels SET status = "rejected", reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?',
-    [adminId, reason, id],
+    "UPDATE reels SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?",
+    [REEL_STATUS.REJECTED, adminId, reason, id],
   );
   return result;
 }
 
 async function deleteReel(id, adminId, reason) {
   const [result] = await pool.query(
-    'UPDATE reels SET status = "deleted", reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?',
-    [adminId, reason, id],
+    "UPDATE reels SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?",
+    [REEL_STATUS.DELETED, adminId, reason, id],
   );
   return result;
 }
@@ -56,3 +58,4 @@ module.exports = {
   rejectReel,
   deleteReel
 };
+

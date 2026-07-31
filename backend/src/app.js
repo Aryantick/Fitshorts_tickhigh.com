@@ -1,3 +1,4 @@
+// App reloaded v2
 const express = require("express");
 const cookieParser = require('cookie-parser');
 const app = express();
@@ -15,4 +16,4 @@ app.get("/", (req, res) => {
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
-});
+});
