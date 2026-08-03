@@ -2,6 +2,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/clien
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { v4: uuidv4 } = require("uuid");
 const s3Config = require("../../config/s3.config");
+const fs = require("fs");
 
 const s3Client = new S3Client({
   region: s3Config.region,
@@ -27,7 +28,7 @@ async function generateUploadUrl(userId, fileExtension) {
   return { uploadUrl, key };
 }
 
-
+//generateAudioUrl
 async function generateAudioUrl(adminId, fileExtension) {
   const key = `music/${adminId}/${uuidv4()}.${fileExtension}`;
 
@@ -44,9 +45,50 @@ async function generateAudioUrl(adminId, fileExtension) {
   return { uploadUrl, key };
 }
 
+//downloadFile
+async function downloadFile(key, localPath) {
+  const command = new GetObjectCommand({
+    Bucket: s3Config.bucketName,
+    Key: key,
+  });
+  const response = await s3Client.send(command);
+  return new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(localPath);
+    response.Body.pipe(writeStream)
+    writeStream.on("finish", resolve);
+    writeStream.on("error", reject);
+  })
+
+}
+async function uploadFile(localPath, key, contentType) {
+  const fileStream = fs.createReadStream(localPath);
+  const command = new PutObjectCommand({
+    Bucket: s3Config.bucketName,
+    Key: key,
+    Body: fileStream,
+    ContentType: contentType,
+  });
+  await s3Client.send(command);
+  return key;
+}
+
+///deleteFile
+async function deleteFile(key) {
+  const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+  const command = new DeleteObjectCommand({
+    Bucket: s3Config.bucketName,
+    Key: key,
+  });
+  await s3Client.send(command);
+  return key;
+}
+
 module.exports = {
   s3Client,
   bucketName: s3Config.bucketName,
   generateUploadUrl,
-  generateAudioUrl
+  generateAudioUrl,
+  downloadFile,
+  uploadFile,
+  deleteFile,
 };

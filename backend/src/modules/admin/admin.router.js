@@ -2,12 +2,18 @@ const router = require("express").Router();
 const AdminController = require("./admin.controller");
 const authenticateAdmin = require("../../middlewares/authenticateAdmin");
 const requireSuperAdmin = require("../../middlewares/requireSuperAdmin");
+const validate = require("../../middlewares/validate.middleware");
+const {
+  adminLoginSchema,
+  adminRegisterSchema,
+} = require("../../validations/admin.validation");
 
-router.post("/admin/login", AdminController.Login);
+router.post("/admin/login", validate(adminLoginSchema), AdminController.Login);
 router.post(
   "/admin/create-moderator",
   authenticateAdmin,
   requireSuperAdmin,
+  validate(adminRegisterSchema),
   AdminController.createModerator,
 );
 router.get(
@@ -31,3 +37,4 @@ router.delete(
   AdminController.deleteReel,
 );
 module.exports = router;
+
