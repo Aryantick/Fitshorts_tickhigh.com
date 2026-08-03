@@ -1,16 +1,20 @@
-const telecomClient = require("../../integrations/telecom/telecom.client");
+const telecomConfigService = require("../telecomConfig/telecomConfig.service");
+const telecomFactory = require("../../integrations/telecom/telecomFactory");
 const telecomMapper = require("../../integrations/telecom/telecom.mapper");
 
-async function checkMsisdnStatus(msisdn, serviceId) {
+async function checkMsisdnStatus(msisdn, clientId = 1) {
   try {
-    const res = await telecomClient.checksub(msisdn, serviceId);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const res = await provider.checkSub(msisdn);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
       throw new Error("Telecom check failed");
     }
 
-    const currentStatus = res.data.currentStatus;
-    const subscriptionStatus = res.data.subscriptionStatus;
+    const currentStatus = res.data?.currentStatus;
+    const subscriptionStatus = res.data?.subscriptionStatus;
     const nextStep = telecomMapper.resolveNextStep(currentStatus);
 
     return {

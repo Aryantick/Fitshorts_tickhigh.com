@@ -1,75 +1,73 @@
 const pool = require("../../config/db.config");
 const { REEL_STATUS } = require("../../constants/enums");
 
-async function createReel(userId, title, description, rawS3Key, category) {
+async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
   const [result] = await pool.query(
-    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, status) VALUES (?,?,?,?,?,?)",
-    [userId, title, description, rawS3Key, category, REEL_STATUS.PENDING_REVIEW],
+    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, client_id, status) VALUES (?,?,?,?,?,?,?)",
+    [userId, title, description, rawS3Key, category, clientId, REEL_STATUS.PENDING_REVIEW]
   );
   console.log("RAW queryResult:", result);
   return result;
 }
 
-async function findFeedReels() {
+async function findFeedReels(clientId = 1) {
   const [rows] = await pool.query(
-    "SELECT * FROM reels WHERE status = ? ORDER BY created_at DESC",
-    [REEL_STATUS.PUBLISHED],
+    "SELECT * FROM reels WHERE status = ? AND client_id = ? ORDER BY created_at DESC",
+    [REEL_STATUS.PUBLISHED, clientId]
   );
   return rows;
 }
 
-
-async function findReelById(id) {
+async function findReelById(id, clientId) {
+  if (clientId) {
+    const [rows] = await pool.query("SELECT * FROM reels WHERE id = ? AND client_id = ?", [id, clientId]);
+    return rows[0] || null;
+  }
   const [rows] = await pool.query("SELECT * FROM reels WHERE id = ?", [id]);
-  return rows[0];
+  return rows[0] || null;
 }
 
-async function deleteReelById(id) {
-  const [result] = await pool.query("DELETE FROM reels WHERE id = ?", [id]);
-
+async function deleteReelById(id, clientId = 1) {
+  const [result] = await pool.query("DELETE FROM reels WHERE id = ? AND client_id = ?", [id, clientId]);
   return result;
 }
 
 async function addLike(reelId, userId) {
   const [result] = await pool.query(
     "INSERT INTO reel_likes (user_id, reel_id) VALUES (?, ?)",
-    [userId, reelId],
+    [userId, reelId]
   );
-
   return result;
 }
 
 async function removeLike(reelId, userId) {
   const [result] = await pool.query(
     "DELETE FROM reel_likes WHERE reel_id = ? AND user_id = ?",
-    [reelId, userId],
+    [reelId, userId]
   );
-
   return result;
 }
 
 async function incrementLikeCount(reelId) {
   const [result] = await pool.query(
     "UPDATE reels SET like_count = like_count + 1 WHERE id = ?",
-    [reelId],
+    [reelId]
   );
-
   return result;
 }
 
 async function decrementLikeCount(reelId) {
   const [result] = await pool.query(
     "UPDATE reels SET like_count = like_count - 1 WHERE id = ?",
-    [reelId],
+    [reelId]
   );
-
   return result;
 }
 
 async function addView(reelId, userId, watchDuration) {
   const [result] = await pool.query(
     "INSERT INTO reel_views (reel_id, user_id, watch_duration) VALUES (?, ?, ?)",
-    [reelId, userId, watchDuration],
+    [reelId, userId, watchDuration]
   );
   return result;
 }
@@ -77,12 +75,12 @@ async function addView(reelId, userId, watchDuration) {
 async function incrementViewCount(reelId) {
   const [result] = await pool.query(
     "UPDATE reels SET view_count = view_count + 1 WHERE id = ?",
-    [reelId],
+    [reelId]
   );
   return result;
 }
 
-async function updateReelMetadata(id, updates) {
+async function updateReelMetadata(id, clientId, updates) {
   const fields = [];
   const values = [];
 
@@ -104,27 +102,27 @@ async function updateReelMetadata(id, updates) {
   }
 
   values.push(id);
+  values.push(clientId);
 
   const [result] = await pool.query(
-    `UPDATE reels SET ${fields.join(", ")} WHERE id = ?`,
-    values,
+    `UPDATE reels SET ${fields.join(", ")} WHERE id = ? AND client_id = ?`,
+    values
   );
   return result;
 }
 
-async function findReelsByUserId(userId) {
+async function findReelsByUserId(userId, clientId = 1) {
   const [rows] = await pool.query(
-    "SELECT * FROM reels WHERE user_id = ? ORDER BY created_at DESC",
-    [userId],
+    "SELECT * FROM reels WHERE user_id = ? AND client_id = ? ORDER BY created_at DESC",
+    [userId, clientId]
   );
   return rows;
 }
 
-
 async function updateTranscodingResult(reelId, { thumbS3Key, hlsS3Key, status }) {
   const [result] = await pool.query(
     "UPDATE reels SET thumb_s3_key = ?, hls_s3_key = ?, transcoding_status = ? WHERE id = ?",
-    [thumbS3Key, hlsS3Key, status, reelId],
+    [thumbS3Key, hlsS3Key, status, reelId]
   );
   return result;
 }
@@ -132,7 +130,7 @@ async function updateTranscodingResult(reelId, { thumbS3Key, hlsS3Key, status })
 async function updateCounts(reelId, viewsCount, likesCount) {
   const [result] = await pool.query(
     "UPDATE reels SET view_count = ?, like_count = ? WHERE id = ?",
-    [viewsCount, likesCount, reelId],
+    [viewsCount, likesCount, reelId]
   );
   return result;
 }
