@@ -1,5 +1,7 @@
-const telecomClient = require("../../integrations/telecom/telecom.client");
+const telecomConfigService = require("../telecomConfig/telecomConfig.service");
+const telecomFactory = require("../../integrations/telecom/telecomFactory");
 const telecomMapper = require("../../integrations/telecom/telecom.mapper");
+const clientService = require("../client/client.service");
 const OtpDBRep = require("./otp.repository");
 const usersRepository = require("../users/users.repository");
 const authRepository = require("../auth/auth.repository");
@@ -9,9 +11,12 @@ const {
 } = require("../../utils/jwt");
 const bcrypt = require("bcrypt");
 
-async function sendSubscribeOtp(msisdn, subServiceId) {
+async function sendSubscribeOtp(msisdn, subServiceId, clientId = 1) {
   try {
-    const res = await telecomClient.subscribeOtp(msisdn, subServiceId);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const res = await provider.subscribeOtp(msisdn, subServiceId);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
       throw new Error("Failed to send OTP");
@@ -23,7 +28,7 @@ async function sendSubscribeOtp(msisdn, subServiceId) {
       msisdn,
       "subscribe",
       res.transactionId,
-      expiresAt,
+      expiresAt
     );
 
     return {
@@ -36,9 +41,12 @@ async function sendSubscribeOtp(msisdn, subServiceId) {
   }
 }
 
-async function verifySubscribeOtp(msisdn, otp) {
+async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
   try {
-    const res = await telecomClient.validateOtp(msisdn, otp);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const res = await provider.validateOtp(msisdn, otp);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
       throw new Error("OTP verification failed");
@@ -56,8 +64,11 @@ async function verifySubscribeOtp(msisdn, otp) {
       userId = user.id;
     }
 
-    const accessToken = generateAccessToken(userId);
-    const refreshToken = generateRefreshToken(userId);
+    // Find-or-create user_client_relations row
+    await clientService.recordUserClientRelation(userId, clientId);
+
+    const accessToken = generateAccessToken(userId, clientId);
+    const refreshToken = generateRefreshToken(userId, clientId);
 
     const hashedToken = await bcrypt.hash(refreshToken, 10);
     const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
@@ -65,7 +76,7 @@ async function verifySubscribeOtp(msisdn, otp) {
     await authRepository.saveRefreshToken(
       userId,
       hashedToken,
-      refreshExpiresAt,
+      refreshExpiresAt
     );
 
     return {

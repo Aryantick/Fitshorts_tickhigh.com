@@ -16,7 +16,7 @@ async function getUploadUrl(userId, fileExtension) {
   }
 }
 
-async function createReel(userId, title, description, rawS3Key, category, musicId) {
+async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
   try {
     const result = await ReelsRepository.createReel(
       userId,
@@ -25,6 +25,7 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
       rawS3Key,
       category,
       musicId,
+      clientId
     );
 
     if (musicId) {
@@ -54,9 +55,9 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
   }
 }
 
-async function getFeed(tenantId = "default") {
+async function getFeed(clientId = 1) {
   try {
-    const reels = await ReelsRepository.findFeedReels();
+    const reels = await ReelsRepository.findFeedReels(clientId);
 
     const reelsWithUrls = await Promise.all(
       reels.map(async (reel) => {
@@ -68,7 +69,7 @@ async function getFeed(tenantId = "default") {
             Bucket: S3Client.bucketName,
             Key: videoKey,
           }),
-          { expiresIn: 3600 },
+          { expiresIn: 3600 }
         );
 
         let thumbUrl = null;
@@ -79,12 +80,12 @@ async function getFeed(tenantId = "default") {
               Bucket: S3Client.bucketName,
               Key: reel.thumb_s3_key,
             }),
-            { expiresIn: 3600 },
+            { expiresIn: 3600 }
           );
         }
 
-        // Merge Real-Time Redis counters
-        const realtimeStats = await RedisUtil.getRealtimeStats(tenantId, reel.id);
+        // Merge Real-Time Redis counters using clientId
+        const realtimeStats = await RedisUtil.getRealtimeStats(String(clientId), reel.id);
 
         return {
           ...reel,
@@ -93,7 +94,7 @@ async function getFeed(tenantId = "default") {
           view_count: Math.max(reel.view_count || 0, realtimeStats.views),
           like_count: Math.max(reel.like_count || 0, realtimeStats.likes),
         };
-      }),
+      })
     );
 
     return reelsWithUrls;
@@ -103,9 +104,9 @@ async function getFeed(tenantId = "default") {
   }
 }
 
-async function getReelById(id, tenantId = "default") {
+async function getReelById(id, clientId = 1) {
   try {
-    const reel = await ReelsRepository.findReelById(id);
+    const reel = await ReelsRepository.findReelById(id, clientId);
     if (!reel) {
       throw new Error("Reel not found");
     }
@@ -116,7 +117,7 @@ async function getReelById(id, tenantId = "default") {
         Bucket: S3Client.bucketName,
         Key: videoKey,
       }),
-      { expiresIn: 3600 },
+      { expiresIn: 3600 }
     );
 
     let thumbUrl = null;
@@ -127,11 +128,11 @@ async function getReelById(id, tenantId = "default") {
           Bucket: S3Client.bucketName,
           Key: reel.thumb_s3_key,
         }),
-        { expiresIn: 3600 },
+        { expiresIn: 3600 }
       );
     }
 
-    const realtimeStats = await RedisUtil.getRealtimeStats(tenantId, id);
+    const realtimeStats = await RedisUtil.getRealtimeStats(String(clientId), id);
 
     return {
       ...reel,
@@ -146,16 +147,16 @@ async function getReelById(id, tenantId = "default") {
   }
 }
 
-async function deleteReel(id, userId) {
+async function deleteReel(id, userId, clientId = 1) {
   try {
-    const reel = await ReelsRepository.findReelById(id);
+    const reel = await ReelsRepository.findReelById(id, clientId);
     if (!reel) {
       throw new Error("Reel not found");
     }
     if (reel.user_id !== userId) {
       throw new Error("You are not authorized to delete this reel");
     }
-    await ReelsRepository.deleteReelById(id);
+    await ReelsRepository.deleteReelById(id, clientId);
     return {
       message: "Reel deleted successfully",
     };
@@ -165,11 +166,15 @@ async function deleteReel(id, userId) {
   }
 }
 
-async function likeReel(reelId, userId, tenantId = "default") {
+async function likeReel(reelId, userId, clientId = 1) {
   try {
+    const reel = await ReelsRepository.findReelById(reelId, clientId);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
     await ReelsRepository.addLike(reelId, userId);
     // Atomic increment in Redis for instant feedback
-    const newCount = await RedisUtil.incrementLikeCount(tenantId, reelId);
+    const newCount = await RedisUtil.incrementLikeCount(String(clientId), reelId);
 
     return {
       success: true,
@@ -184,15 +189,19 @@ async function likeReel(reelId, userId, tenantId = "default") {
   }
 }
 
-async function unlikeReel(reelId, userId, tenantId = "default") {
+async function unlikeReel(reelId, userId, clientId = 1) {
   try {
+    const reel = await ReelsRepository.findReelById(reelId, clientId);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
     const result = await ReelsRepository.removeLike(reelId, userId);
     if (result.affectedRows === 0) {
       throw new Error("Reel is not liked by the user.");
     }
 
     // Atomic decrement in Redis
-    const newCount = await RedisUtil.decrementLikeCount(tenantId, reelId);
+    const newCount = await RedisUtil.decrementLikeCount(String(clientId), reelId);
 
     return {
       success: true,
@@ -204,11 +213,15 @@ async function unlikeReel(reelId, userId, tenantId = "default") {
   }
 }
 
-async function recordView(reelId, userId, watchDuration, tenantId = "default") {
+async function recordView(reelId, userId, watchDuration, clientId = 1) {
   try {
+    const reel = await ReelsRepository.findReelById(reelId, clientId);
+    if (!reel) {
+      throw new Error("Reel not found");
+    }
     await ReelsRepository.addView(reelId, userId, watchDuration);
     // Atomic increment in Redis
-    const newCount = await RedisUtil.incrementViewCount(tenantId, reelId);
+    const newCount = await RedisUtil.incrementViewCount(String(clientId), reelId);
 
     return {
       counted: true,
@@ -227,9 +240,9 @@ async function recordView(reelId, userId, watchDuration, tenantId = "default") {
   }
 }
 
-async function updateReelMetadata(id, userId, updates) {
+async function updateReelMetadata(id, userId, updates, clientId = 1) {
   try {
-    const reel = await ReelsRepository.findReelById(id);
+    const reel = await ReelsRepository.findReelById(id, clientId);
     if (!reel) {
       throw new Error("Reel not found");
     }
@@ -237,8 +250,8 @@ async function updateReelMetadata(id, userId, updates) {
       throw new Error("You are not authorized to edit this reel");
     }
 
-    await ReelsRepository.updateReelMetadata(id, updates);
-    const updatedReel = await ReelsRepository.findReelById(id);
+    await ReelsRepository.updateReelMetadata(id, clientId, updates);
+    const updatedReel = await ReelsRepository.findReelById(id, clientId);
     return updatedReel;
   } catch (error) {
     console.error("updateReel error:", error.message);
@@ -246,9 +259,9 @@ async function updateReelMetadata(id, userId, updates) {
   }
 }
 
-async function getMyReels(userId) {
+async function getMyReels(userId, clientId = 1) {
   try {
-    const reels = await ReelsRepository.findReelsByUserId(userId);
+    const reels = await ReelsRepository.findReelsByUserId(userId, clientId);
     return reels;
   } catch (error) {
     console.error("getMyReels error:", error.message);
@@ -266,5 +279,5 @@ module.exports = {
   unlikeReel,
   recordView,
   updateReelMetadata,
-  getMyReels
+  getMyReels,
 };

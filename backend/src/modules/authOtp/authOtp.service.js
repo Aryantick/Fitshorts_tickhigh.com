@@ -1,14 +1,19 @@
-const telecomClient = require("../../integrations/telecom/telecom.client");
+const telecomConfigService = require("../telecomConfig/telecomConfig.service");
+const telecomFactory = require("../../integrations/telecom/telecomFactory");
 const telecomMapper = require("../../integrations/telecom/telecom.mapper");
+const clientService = require("../client/client.service");
 const OtpDBRep = require("../otp/otp.repository");
 const usersRepository = require("../users/users.repository");
 const authRepository = require("../auth/auth.repository");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/jwt");
 const bcrypt = require("bcrypt");
 
-async function sendAuthOtp(msisdn) {
+async function sendAuthOtp(msisdn, clientId = 1) {
   try {
-    const res = await telecomClient.authOtpGenerate(msisdn);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const res = await provider.authOtpGenerate(msisdn);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
       throw new Error("Failed to send OTP");
@@ -25,9 +30,12 @@ async function sendAuthOtp(msisdn) {
   }
 }
 
-async function verifyAuthOtp(msisdn, otp) {
+async function verifyAuthOtp(msisdn, otp, clientId = 1) {
   try {
-    const res = await telecomClient.authOtpValidate(msisdn, otp);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const res = await provider.authOtpValidate(msisdn, otp);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
       throw new Error("OTP verification failed");
@@ -42,8 +50,11 @@ async function verifyAuthOtp(msisdn, otp) {
 
     const userId = user.id;
 
-    const accessToken = generateAccessToken(userId);
-    const refreshToken = generateRefreshToken(userId);
+    // Record user-client relation
+    await clientService.recordUserClientRelation(userId, clientId);
+
+    const accessToken = generateAccessToken(userId, clientId);
+    const refreshToken = generateRefreshToken(userId, clientId);
 
     const hashedToken = await bcrypt.hash(refreshToken, 10);
     const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -61,10 +72,12 @@ async function verifyAuthOtp(msisdn, otp) {
   }
 }
 
-// Unsubscribe — telecom side cancel only, NOT related to login/logout
-async function unsubscribeUser(msisdn) {
+async function unsubscribeUser(msisdn, clientId = 1) {
   try {
-    const telecomRes = await telecomClient.Unsubscription(msisdn);
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    const provider = telecomFactory.getTelecomProvider(telecomConfig);
+
+    const telecomRes = await provider.unsubscription(msisdn);
 
     if (!telecomMapper.issuccess(telecomRes.responseCode)) {
       throw new Error("Failed to unsubscribe on telecom side");
@@ -74,8 +87,6 @@ async function unsubscribeUser(msisdn) {
     if (!user) {
       throw new Error("User not found");
     }
-
-    // TODO: user_subscriptions table ka status yahan update karna hai
 
     return { msisdn, unsubscribed: true };
   } catch (error) {

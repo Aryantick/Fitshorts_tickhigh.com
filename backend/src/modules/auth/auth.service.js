@@ -9,6 +9,7 @@ async function refreshAccessToken(refreshToken) {
   try {
     const payload = verifyRefreshToken(refreshToken);
     const userId = payload.userId;
+    const clientId = payload.clientId;
 
     const storedTokens = await authRepository.findRefreshTokensByUserId(userId);
 
@@ -26,7 +27,7 @@ async function refreshAccessToken(refreshToken) {
     }
 
     // NO rotation — same refresh token stays valid until it expires (30 days)
-    const newAccessToken = generateAccessToken(userId);
+    const newAccessToken = generateAccessToken(userId, clientId);
 
     return { accessToken: newAccessToken };
   } catch (error) {
@@ -34,6 +35,7 @@ async function refreshAccessToken(refreshToken) {
     throw new Error("Invalid or expired refresh token");
   }
 }
+
 async function logout(userId) {
   await authRepository.deleteRefreshTokensByUserId(userId);
   return { message: "Logged out successfully" };
@@ -41,5 +43,5 @@ async function logout(userId) {
 
 module.exports = {
   refreshAccessToken,
-  logout
+  logout,
 };
