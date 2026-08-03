@@ -5,24 +5,46 @@ const path = require("path");
 async function runMigration003() {
   const connection = await pool.getConnection();
   try {
-    console.log("Starting Migration 003...");
+    console.log("Starting Full Database Initialization & Migration...");
 
-    // 1. Execute SQL schema file statements
-    const sqlPath = path.join(__dirname, "../src/db/migrations/003_multi_tenant_schema.sql");
-    const sqlContent = fs.readFileSync(sqlPath, "utf8");
+    // Helper to execute SQL file statements
+    const executeSqlFile = async (fileName) => {
+      const sqlPath = path.join(__dirname, `../src/db/migrations/${fileName}`);
+      if (!fs.existsSync(sqlPath)) return;
+      console.log(`Executing ${fileName}...`);
+      const sqlContent = fs.readFileSync(sqlPath, "utf8");
+      const statements = sqlContent
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 
-    // Split statements by semicolon
-    const statements = sqlContent
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+      for (const statement of statements) {
+        try {
+          await connection.query(statement);
+        } catch (err) {
+          // Ignore duplicate column / table / constraint errors if re-run
+          if (
+            err.code !== "ER_TABLE_EXISTS_ERROR" &&
+            err.code !== "ER_DUP_FIELDNAME" &&
+            err.code !== "ER_DUP_KEYNAME"
+          ) {
+            throw err;
+          }
+        }
+      }
+    };
 
-    for (const statement of statements) {
-      await connection.query(statement);
-    }
+    // 1. Run initial base schema 001 if needed
+    await executeSqlFile("001_init_schema.sql");
+
+    // 2. Run update schema 002 if needed
+    await executeSqlFile("002_update_schema.sql");
+
+    // 3. Run multi-tenant schema 003
+    await executeSqlFile("003_multi_tenant_schema.sql");
     console.log("Created clients, telecom_configs, and user_client_relations tables & default rows.");
 
-    // 2. Safely ALTER user_subscriptions
+    // 4. Safely ALTER user_subscriptions
     const [subCols] = await connection.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_subscriptions' AND COLUMN_NAME = 'client_id'`
     );
@@ -30,15 +52,17 @@ async function runMigration003() {
       await connection.query(
         `ALTER TABLE user_subscriptions ADD COLUMN client_id BIGINT NOT NULL DEFAULT 1 AFTER user_id`
       );
-      await connection.query(
-        `ALTER TABLE user_subscriptions ADD CONSTRAINT fk_user_subscriptions_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE`
-      );
+      try {
+        await connection.query(
+          `ALTER TABLE user_subscriptions ADD CONSTRAINT fk_user_subscriptions_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE`
+        );
+      } catch (e) {}
       console.log("Added client_id column and foreign key to user_subscriptions.");
     } else {
       console.log("client_id column already exists in user_subscriptions.");
     }
 
-    // 3. Safely ALTER reels
+    // 5. Safely ALTER reels
     const [reelCols] = await connection.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'reels' AND COLUMN_NAME = 'client_id'`
     );
@@ -46,9 +70,11 @@ async function runMigration003() {
       await connection.query(
         `ALTER TABLE reels ADD COLUMN client_id BIGINT NOT NULL DEFAULT 1 AFTER user_id`
       );
-      await connection.query(
-        `ALTER TABLE reels ADD CONSTRAINT fk_reels_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE`
-      );
+      try {
+        await connection.query(
+          `ALTER TABLE reels ADD CONSTRAINT fk_reels_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE`
+        );
+      } catch (e) {}
       console.log("Added client_id column and foreign key to reels.");
     } else {
       console.log("client_id column already exists in reels.");

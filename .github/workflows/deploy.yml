@@ -3,7 +3,7 @@ name: Deploy Backend to AWS EC2 (Amazon Linux 2023)
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
@@ -24,7 +24,7 @@ jobs:
           script: |
             echo "Starting deployment on Amazon Linux EC2..."
             cd /home/ec2-user/tickhigh-fitshort/backend
-            git pull origin main
+            git pull origin master
             npm install --production
             node scripts/runMigration003.js
             pm2 reload all --update-env || pm2 start src/app.js --name "fitshorts-api"
