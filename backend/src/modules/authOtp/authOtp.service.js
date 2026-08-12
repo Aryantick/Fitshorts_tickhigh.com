@@ -53,13 +53,16 @@ async function verifyAuthOtp(msisdn, otp, clientId = 1) {
     // 1. Mark auth OTP request as verified in DB
     await OtpDBRep.updateOtpStatus(msisdn, "verified", "auth");
 
-    // 2. Check if user exists in DB (must be subscribed first)
-    const user = await usersRepository.findByMsisdn(msisdn);
-    if (!user) {
-      throw new Error("User not found. Please subscribe first.");
-    }
+    // 2. Find existing user or auto-create in users table for verified active subscriber
+    let user = await usersRepository.findByMsisdn(msisdn);
+    let userId;
 
-    const userId = user.id;
+    if (!user) {
+      const created = await usersRepository.createUser(msisdn);
+      userId = created.id || created.insertId;
+    } else {
+      userId = user.id;
+    }
 
     // 3. Record active user-client tenant relation
     await clientService.recordUserClientRelation(userId, clientId);
