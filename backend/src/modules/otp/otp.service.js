@@ -70,7 +70,7 @@ async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
 
     if (!user) {
       const result = await usersRepository.createUser(msisdn);
-      userId = result.insertId;
+      userId = result.id || result.insertId;
     } else {
       userId = user.id;
     }
