@@ -13,9 +13,11 @@ CREATE TABLE IF NOT EXISTS clients (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Insert Default Client Row ("backreel")
+-- 2. Insert Default Client Rows ("backreel" & "obf")
 INSERT INTO clients (id, name, subdomain, country_code, is_active)
-VALUES (1, 'Wellness360 Default', 'backreel', 'SS', 1)
+VALUES 
+  (1, 'Wellness360 Default', 'backreel', 'SS', 1),
+  (2, 'Orange Burkina Faso', 'obf', 'BF', 1)
 ON DUPLICATE KEY UPDATE name=VALUES(name), subdomain=VALUES(subdomain);
 
 -- 3. Create Telecom Configs Table (No auth_flow_type column)
@@ -32,13 +34,21 @@ CREATE TABLE IF NOT EXISTS telecom_configs (
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
--- 4. Insert Default ZAIN Telecom Config for Default Client
+-- 4. Insert Default Telecom Configs (ZAIN & ORANGE_BF)
 INSERT INTO telecom_configs (client_id, provider_key, base_url, extra_config, is_active)
-VALUES (
+VALUES 
+(
   1,
   'ZAIN',
   'https://wbilzss.tickhighs.com',
-  '{"serviceId": "WELLNESS", "cpId": "100", "channel": "wap", "country": "SS", "operator": "ZAIN", "reqType": "1", "language": "_E"}',
+  '{"serviceId": "WELLNESS", "cpId": "100", "channel": "wap", "country": "SS", "operator": "ZAIN", "reqType": "1", "language": "_E", "allowedPlans": ["FDaily", "FWeekly", "FMonthly"]}',
+  1
+),
+(
+  2,
+  'ORANGE_BF',
+  'https://obfpartner.telecomnetsolution.com',
+  '{"serviceId": "Health Portal Livliness", "cpId": "100", "channel": "wap", "country": "BF", "operator": "ORG", "reqType": "1", "allowedPlans": ["Health Portal Livliness pass jour", "Health Portal Livliness pass semaine", "Health Portal Livliness pass mois", "Health Portal Livliness acte jour", "Health Portal Livliness acte semaine", "Health Portal Livliness acte mois"]}',
   1
 )
 ON DUPLICATE KEY UPDATE provider_key=VALUES(provider_key), base_url=VALUES(base_url), extra_config=VALUES(extra_config);

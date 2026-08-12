@@ -43,7 +43,9 @@ async function uploadReel(req, res) {
 async function getFeed(req, res) {
   try {
     const clientId = req.client ? req.client.id : 1;
-    const result = await ReelService.getFeed(clientId);
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const result = await ReelService.getFeed(clientId, page, limit);
     return apiResponse(res, 200, "Feed fetched successfully", result);
   } catch (error) {
     return apiResponse(res, 400, error.message);
@@ -116,8 +118,8 @@ async function recordView(req, res) {
   const { watchDuration } = req.body;
   const clientId = req.client ? req.client.id : 1;
 
-  if (watchDuration === undefined || watchDuration < 3) {
-    return apiResponse(res, 400, "Minimum 3 seconds watch time required");
+  if (watchDuration === undefined || watchDuration < 5) {
+    return apiResponse(res, 400, "Minimum 5 seconds watch time required");
   }
 
   try {

@@ -1,21 +1,30 @@
 const otpService = require("./otp.service");
 const apiResponse = require("../../utils/apiResponse");
 
+/**
+ * Controller: Send Subscription OTP (POST /api/otp/send)
+ * Triggers subscription OTP send request to the resolved tenant telecom gateway
+ */
 async function sendOtp(req, res) {
   const { msisdn, subServiceId } = req.body || {};
-  if (!msisdn || !subServiceId) {
-    return apiResponse(res, 400, "msisdn and subServiceId are required");
+  if (!msisdn) {
+    return apiResponse(res, 400, "msisdn is required");
   }
 
   try {
     const clientId = req.client ? req.client.id : 1;
-    const result = await otpService.sendSubscribeOtp(msisdn, subServiceId, clientId);
+    const effectiveSubServiceId = subServiceId || 1;
+    const result = await otpService.sendSubscribeOtp(msisdn, effectiveSubServiceId, clientId);
     return apiResponse(res, 200, "OTP sent successfully", result);
   } catch (error) {
     return apiResponse(res, 400, error.message);
   }
 }
 
+/**
+ * Controller: Verify Subscription OTP (POST /api/otp/verify)
+ * Verifies OTP with telecom gateway, creates user, records client relation & subscription state, sets refresh cookie & returns JWT access token
+ */
 async function OtpVerify(req, res) {
   const { msisdn, otp } = req.body || {};
   if (!msisdn || !otp) {

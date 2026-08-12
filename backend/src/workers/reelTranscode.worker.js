@@ -1,6 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
+
+try {
+  const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+  if (ffmpegInstaller && ffmpegInstaller.path) {
+    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+  }
+} catch (e) {
+  // System ffmpeg fallback
+}
 const reelTranscodeQueue = require("../queues/reelTranscode.queue");
 const S3Client = require("../integrations/s3/s3.client");
 const ReelsRepository = require("../modules/reels/reels.repository");
@@ -12,15 +21,13 @@ if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
-reelTranscodeQueue.process(async (job) => {
-  const { reelId, s3Key } = job.data;
-
+async function processReelTranscode({ reelId, s3Key }) {
   const rawLocalPath = path.join(TEMP_DIR, `${reelId}_raw.mp4`);
   const thumbLocalPath = path.join(TEMP_DIR, `${reelId}_thumb.jpg`);
   const hlsOutputDir = path.join(TEMP_DIR, `${reelId}_hls`);
 
   try {
-    console.log(`Processing reel ${reelId}...`);
+    console.log(`[Transcoder] Processing reel ${reelId}...`);
 
     // Step 1: Download raw video from S3
     await S3Client.downloadFile(s3Key, rawLocalPath);
@@ -49,9 +56,9 @@ reelTranscodeQueue.process(async (job) => {
       status: TRANSCODING_STATUS.COMPLETED,
     });
 
-    console.log(`Reel ${reelId} processed successfully!`);
+    console.log(`[Transcoder] Reel ${reelId} processed successfully!`);
   } catch (error) {
-    console.error(`Failed to process reel ${reelId}:`, error.message);
+    console.error(`[Transcoder] Failed to process reel ${reelId}:`, error.message);
     await ReelsRepository.updateTranscodingResult(reelId, {
       thumbS3Key: null,
       hlsS3Key: null,
@@ -62,7 +69,19 @@ reelTranscodeQueue.process(async (job) => {
     cleanupFiles([rawLocalPath, thumbLocalPath]);
     cleanupFolder(hlsOutputDir);
   }
-});
+}
+
+try {
+  reelTranscodeQueue.process(async (job) => {
+    await processReelTranscode(job.data);
+  });
+} catch (e) {
+  console.warn("[Queue Warning] Redis queue process failed to bind:", e.message);
+}
+
+module.exports = {
+  processReelTranscodeDirectly: processReelTranscode,
+};
 
 
 function generateThumbnail(inputPath, outputPath) {
@@ -86,10 +105,10 @@ function generateHLS(inputPath, outputDir) {
     const p720 = path.join(outputDir, "720p.m3u8");
 
     ffmpeg(inputPath)
-      // 360p Stream (Optimized for Low Networks)
+      // 360p Stream (Optimized for Low Mobile Networks)
       .output(p360)
       .outputOptions([
-        "-vf scale=w=640:h=360:force_original_aspect_ratio=decrease",
+        "-vf scale=-2:360,format=yuv420p",
         "-c:v libx264",
         "-b:v 800k",
         "-maxrate 856k",
@@ -101,10 +120,10 @@ function generateHLS(inputPath, outputDir) {
         "-hls_segment_filename",
         path.join(outputDir, "360p_%03d.ts"),
       ])
-      // 480p Stream (Medium Network)
+      // 480p Stream (Medium Mobile Network)
       .output(p480)
       .outputOptions([
-        "-vf scale=w=854:h=480:force_original_aspect_ratio=decrease",
+        "-vf scale=-2:480,format=yuv420p",
         "-c:v libx264",
         "-b:v 1400k",
         "-maxrate 1498k",
@@ -119,7 +138,7 @@ function generateHLS(inputPath, outputDir) {
       // 720p Stream (HD)
       .output(p720)
       .outputOptions([
-        "-vf scale=w=1280:h=720:force_original_aspect_ratio=decrease",
+        "-vf scale=-2:720,format=yuv420p",
         "-c:v libx264",
         "-b:v 2800k",
         "-maxrate 2996k",
@@ -180,4 +199,6 @@ function cleanupFolder(folderPath) {
   }
 }
 
-module.exports = reelTranscodeQueue;
+module.exports = {
+  processReelTranscodeDirectly: processReelTranscode,
+};
