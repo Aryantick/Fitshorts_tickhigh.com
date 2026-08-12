@@ -29,9 +29,19 @@ async function recordUserClientRelation(userId, clientId) {
   return result;
 }
 
+async function deactivateUserClientRelation(userId, clientId) {
+  if (!userId || !clientId) return null;
+  const [result] = await pool.query(
+    `UPDATE user_client_relations SET is_active = 0 WHERE user_id = ? AND client_id = ?`,
+    [userId, clientId]
+  );
+  return result;
+}
+
 module.exports = {
   findBySubdomain,
   findById,
   createClient,
   recordUserClientRelation,
+  deactivateUserClientRelation,
 };

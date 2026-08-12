@@ -19,6 +19,7 @@ const uploadReelSchema = {
         message: `category must be one of: ${categoryValues.join(", ")}`,
       }),
     }),
+    musicId: z.number().or(z.string()).optional().nullable(),
   }),
 };
 

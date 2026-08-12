@@ -1,6 +1,9 @@
 const authOtpService = require("./authOtp.service");
 const apiResponse = require("../../utils/apiResponse");
 
+/**
+ * Controller: Send Auth OTP for Existing User Login (POST /api/auth-otp/send)
+ */
 async function sendOtp(req, res) {
   const { msisdn } = req.body || {};
   if (!msisdn) {
@@ -16,6 +19,10 @@ async function sendOtp(req, res) {
   }
 }
 
+/**
+ * Controller: Verify Auth OTP for Existing User Login (POST /api/auth-otp/verify)
+ * Verifies OTP, checks user existence in DB, sets refresh cookie & returns JWT access token
+ */
 async function verifyOtp(req, res) {
   const { msisdn, otp } = req.body || {};
   if (!msisdn || !otp) {
@@ -42,6 +49,10 @@ async function verifyOtp(req, res) {
   }
 }
 
+/**
+ * Controller: Unsubscribe User (POST /api/unsubscribe)
+ * Triggers unsubscription with operator telecom gateway and deactivates relation & subscription state in DB
+ */
 async function UnsubscribeUser(req, res) {
   const { msisdn } = req.body || {};
   if (!msisdn) {

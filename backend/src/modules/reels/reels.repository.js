@@ -3,17 +3,18 @@ const { REEL_STATUS } = require("../../constants/enums");
 
 async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
   const [result] = await pool.query(
-    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, client_id, status) VALUES (?,?,?,?,?,?,?)",
-    [userId, title, description, rawS3Key, category, clientId, REEL_STATUS.PENDING_REVIEW]
+    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, music_id, client_id, status) VALUES (?,?,?,?,?,?,?,?)",
+    [userId, title, description, rawS3Key, category, musicId || null, clientId, REEL_STATUS.PENDING_REVIEW]
   );
   console.log("RAW queryResult:", result);
   return result;
 }
 
-async function findFeedReels(clientId = 1) {
+async function findFeedReels(clientId = 1, page = 1, limit = 10) {
+  const offset = (Math.max(1, Number(page)) - 1) * Number(limit);
   const [rows] = await pool.query(
-    "SELECT * FROM reels WHERE status = ? AND client_id = ? ORDER BY created_at DESC",
-    [REEL_STATUS.PUBLISHED, clientId]
+    "SELECT * FROM reels WHERE status IN (?, ?) AND client_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+    [REEL_STATUS.PUBLISHED, REEL_STATUS.APPROVED, clientId, Number(limit), Number(offset)]
   );
   return rows;
 }

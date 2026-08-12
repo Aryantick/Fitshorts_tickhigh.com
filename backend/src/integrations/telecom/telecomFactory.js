@@ -1,4 +1,5 @@
 const ZainProvider = require("./providers/zain.provider");
+const OrangeProvider = require("./providers/orange.provider");
 
 function getTelecomProvider(config) {
   if (!config || !config.provider_key) {
@@ -10,6 +11,9 @@ function getTelecomProvider(config) {
   switch (providerKey) {
     case "ZAIN":
       return new ZainProvider(config);
+    case "ORANGE_BF":
+    case "ORANGE":
+      return new OrangeProvider(config);
     default:
       throw new Error(`Unsupported telecom provider key: ${config.provider_key}`);
   }

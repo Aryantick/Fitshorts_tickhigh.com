@@ -11,6 +11,10 @@ const {
 } = require("../../utils/jwt");
 const bcrypt = require("bcrypt");
 
+/**
+ * Service: Send Subscription OTP
+ * Triggers OTP send via operator gateway and logs audit record in otp_requests (flow_type = 'subscribe')
+ */
 async function sendSubscribeOtp(msisdn, subServiceId, clientId = 1) {
   try {
     const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
@@ -22,8 +26,9 @@ async function sendSubscribeOtp(msisdn, subServiceId, clientId = 1) {
       throw new Error("Failed to send OTP");
     }
 
-    const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min expiration
 
+    // Store OTP request in DB for audit trail
     await OtpDBRep.createOtpRequest(
       msisdn,
       "subscribe",
@@ -41,6 +46,10 @@ async function sendSubscribeOtp(msisdn, subServiceId, clientId = 1) {
   }
 }
 
+/**
+ * Service: Verify Subscription OTP & Complete Subscription Signup
+ * Validates OTP with operator, creates user record, updates user_client_relations & user_subscriptions state, and generates JWT tokens
+ */
 async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
   try {
     const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
@@ -52,8 +61,10 @@ async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
       throw new Error("OTP verification failed");
     }
 
+    // 1. Mark OTP audit request as verified in DB
     await OtpDBRep.updateOtpStatus(msisdn, "verified", "subscribe");
 
+    // 2. Find existing user or create a new user row in users table
     let user = await usersRepository.findByMsisdn(msisdn);
     let userId;
 
@@ -64,9 +75,24 @@ async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
       userId = user.id;
     }
 
-    // Find-or-create user_client_relations row
+    // 3. Find-or-create user_client_relations row (sets is_active = 1)
     await clientService.recordUserClientRelation(userId, clientId);
 
+    // 4. Record active state in user_subscriptions table
+    const subscriptionRepository = require("../subscription/subscription.repository");
+    try {
+      await subscriptionRepository.upsertUserSubscription({
+        userId,
+        clientId,
+        currentStatus: "active",
+        subscriptionStatus: "active",
+        engineTransactionId: res.transactionId,
+      });
+    } catch (e) {
+      console.error("upsertUserSubscription warning:", e.message);
+    }
+
+    // 5. Generate Access Token & Refresh Token for session authentication
     const accessToken = generateAccessToken(userId, clientId);
     const refreshToken = generateRefreshToken(userId, clientId);
 

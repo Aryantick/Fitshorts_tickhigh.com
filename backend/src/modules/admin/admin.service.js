@@ -8,6 +8,7 @@ const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const { pool } = require("../../config/db.config");
 const NotifactionService = require("../notifications/notifications.service")
 const ReelRepository = require("../reels/reels.repository")
+const MusicService = require("../music/music.service");
 
 async function loginAdmin(identifier, password) {
   try {
@@ -82,19 +83,52 @@ async function getPendingReels() {
     const result = await AdminRepository.findPendingReels();
     const reelsWithUrls = await Promise.all(
       result.map(async (reel) => {
-        const videoKey = reel.hls_s3_key || reel.raw_s3_key;
+        const videoKey = reel.raw_s3_key || reel.hls_s3_key;
+        let videoUrl = null;
 
-        const videoUrl = await getSignedUrl(
-          S3Client.s3Client,
-          new GetObjectCommand({
-            Bucket: S3Client.bucketName,
-            Key: videoKey,
-          }),
-          { expiresIn: 3600 },
-        );
+        if (videoKey) {
+          videoUrl = await getSignedUrl(
+            S3Client.s3Client,
+            new GetObjectCommand({
+              Bucket: S3Client.bucketName,
+              Key: videoKey,
+            }),
+            { expiresIn: 3600 }
+          );
+        }
 
-        return { ...reel, videoUrl };
-      }),
+        let musicUrl = null;
+        let musicTitle = null;
+        let musicArtist = null;
+
+        if (reel.music_id) {
+          try {
+            const musicTrack = await MusicService.getMusicById(reel.music_id);
+            if (musicTrack && musicTrack.s3_key) {
+              musicUrl = await getSignedUrl(
+                S3Client.s3Client,
+                new GetObjectCommand({
+                  Bucket: S3Client.bucketName,
+                  Key: musicTrack.s3_key,
+                }),
+                { expiresIn: 3600 }
+              );
+              musicTitle = musicTrack.title;
+              musicArtist = musicTrack.artist;
+            }
+          } catch (musicErr) {
+            console.warn("Failed to attach music audioUrl in admin service:", musicErr.message);
+          }
+        }
+
+        return {
+          ...reel,
+          videoUrl,
+          music_url: musicUrl,
+          music_title: musicTitle,
+          music_artist: musicArtist,
+        };
+      })
     );
 
     return reelsWithUrls;

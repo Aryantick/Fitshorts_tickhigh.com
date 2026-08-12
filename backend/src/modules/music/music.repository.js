@@ -42,10 +42,16 @@ async function findTrandingMusic(limit = 10) {
 
 
 
+async function findMusicById(id) {
+  const [rows] = await pool.query("SELECT * FROM music_tracks WHERE id = ?", [id]);
+  return rows[0] || null;
+}
+
 module.exports = {
   CreateMusic,
   findbyMusic,
   findMusicByCategory,
   incrementUsageCount,
-  findTrandingMusic
+  findTrandingMusic,
+  findMusicById,
 };

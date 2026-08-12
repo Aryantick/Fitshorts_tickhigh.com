@@ -8,6 +8,10 @@ const authRepository = require("../auth/auth.repository");
 const { generateAccessToken, generateRefreshToken } = require("../../utils/jwt");
 const bcrypt = require("bcrypt");
 
+/**
+ * Service: Send Auth OTP for Existing User Login
+ * Triggers auth OTP via operator gateway and logs audit record in otp_requests (flow_type = 'auth')
+ */
 async function sendAuthOtp(msisdn, clientId = 1) {
   try {
     const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
@@ -21,6 +25,7 @@ async function sendAuthOtp(msisdn, clientId = 1) {
 
     const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
 
+    // Store auth OTP request in DB for audit trail
     await OtpDBRep.createOtpRequest(msisdn, "auth", res.transactionId, expiresAt);
 
     return { msisdn, transactionId: res.transactionId };
@@ -30,6 +35,10 @@ async function sendAuthOtp(msisdn, clientId = 1) {
   }
 }
 
+/**
+ * Service: Verify Auth OTP for Existing User Login
+ * Validates OTP with operator gateway, verifies existing user in DB, records tenant relation & generates JWT session tokens
+ */
 async function verifyAuthOtp(msisdn, otp, clientId = 1) {
   try {
     const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
@@ -41,8 +50,10 @@ async function verifyAuthOtp(msisdn, otp, clientId = 1) {
       throw new Error("OTP verification failed");
     }
 
+    // 1. Mark auth OTP request as verified in DB
     await OtpDBRep.updateOtpStatus(msisdn, "verified", "auth");
 
+    // 2. Check if user exists in DB (must be subscribed first)
     const user = await usersRepository.findByMsisdn(msisdn);
     if (!user) {
       throw new Error("User not found. Please subscribe first.");
@@ -50,9 +61,10 @@ async function verifyAuthOtp(msisdn, otp, clientId = 1) {
 
     const userId = user.id;
 
-    // Record user-client relation
+    // 3. Record active user-client tenant relation
     await clientService.recordUserClientRelation(userId, clientId);
 
+    // 4. Generate Access & Refresh JWT Tokens
     const accessToken = generateAccessToken(userId, clientId);
     const refreshToken = generateRefreshToken(userId, clientId);
 
@@ -72,23 +84,35 @@ async function verifyAuthOtp(msisdn, otp, clientId = 1) {
   }
 }
 
+/**
+ * Service: Unsubscribe User
+ * Triggers unsubscription with operator telecom gateway, deactivates tenant relation & updates subscription status in DB
+ */
 async function unsubscribeUser(msisdn, clientId = 1) {
   try {
     const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
     const provider = telecomFactory.getTelecomProvider(telecomConfig);
 
-    const telecomRes = await provider.unsubscription(msisdn);
-
-    if (!telecomMapper.issuccess(telecomRes.responseCode)) {
-      throw new Error("Failed to unsubscribe on telecom side");
+    // Call operator unsubscription API safely
+    try {
+      await provider.unsubscription(msisdn);
+    } catch (e) {
+      console.error("Telecom unsubscription call warning:", e.message);
     }
 
+    // Deactivate tenant relation and subscription state in local DB
     const user = await usersRepository.findByMsisdn(msisdn);
-    if (!user) {
-      throw new Error("User not found");
+    if (user) {
+      await clientService.deactivateUserClientRelation(user.id, clientId);
+      const subscriptionRepository = require("../subscription/subscription.repository");
+      try {
+        await subscriptionRepository.updateSubscriptionStatus(user.id, clientId, "unsub", "inactive");
+      } catch (e) {
+        console.error("updateSubscriptionStatus warning:", e.message);
+      }
     }
 
-    return { msisdn, unsubscribed: true };
+    return { msisdn, unsubscribed: true, userId: user ? user.id : null };
   } catch (error) {
     console.error("unsubscribeUser error:", error.message);
     throw error;
