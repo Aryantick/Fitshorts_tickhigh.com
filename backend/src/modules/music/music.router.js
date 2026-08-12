@@ -28,6 +28,7 @@ router.get(
 
 
 
+router.get("/music/categories", authenticateUser, MusicController.musicCategories);
 router.get("/music", authenticateUser, MusicController.getAllMusic);
 
 router.get(

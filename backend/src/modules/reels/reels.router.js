@@ -9,6 +9,7 @@ const {
 } = require("../../validations/reels.validation");
 
 router.get("/reels/upload-url", authenticateUser, reelsController.getUploadUrl);
+router.post("/reels/upload", authenticateUser, validate(uploadReelSchema), reelsController.uploadReel);
 router.post("/reels", authenticateUser, validate(uploadReelSchema), reelsController.uploadReel);
 router.get("/reels/feed", authenticateUser, reelsController.getFeed);
 router.get("/reels/my-reels", authenticateUser, reelsController.getMyReels);   

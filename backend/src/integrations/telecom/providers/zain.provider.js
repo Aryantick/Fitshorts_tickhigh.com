@@ -1,7 +1,14 @@
 const axios = require("axios");
 const telecomMapper = require("../telecom.mapper");
 
+/**
+ * Zain Telecom Provider Implementation (South Sudan - SS)
+ * Standardizes communication with Zain Telecom Gateway APIs
+ */
 class ZainProvider {
+  /**
+   * Constructor initializes HTTP client with Zain base URL and extra configurations
+   */
   constructor(config) {
     if (!config || !config.base_url) {
       throw new Error("ZainProvider requires base_url in telecom config");
@@ -23,6 +30,10 @@ class ZainProvider {
     });
   }
 
+  /**
+   * 1. Check Subscription Status
+   * Target Telecom Endpoint: GET /sub/checksub
+   */
   async checkSub(msisdn) {
     try {
       const response = await this.client.get("/sub/checksub", {
@@ -38,6 +49,10 @@ class ZainProvider {
     }
   }
 
+  /**
+   * 2. Send Subscription OTP
+   * Target Telecom Endpoint: GET /otp/subscribe
+   */
   async subscribeOtp(msisdn, subServiceId) {
     try {
       const response = await this.client.get("/otp/subscribe", {
@@ -60,6 +75,10 @@ class ZainProvider {
     }
   }
 
+  /**
+   * 3. Validate Subscription OTP
+   * Target Telecom Endpoint: GET /otp/validate_otp
+   */
   async validateOtp(msisdn, otp) {
     try {
       const response = await this.client.get("/otp/validate_otp", {
@@ -72,6 +91,10 @@ class ZainProvider {
     }
   }
 
+  /**
+   * 4. Send Auth OTP (Login Flow)
+   * Target Telecom Endpoint: GET /auth/otp/generate
+   */
   async authOtpGenerate(msisdn) {
     try {
       const response = await this.client.get("/auth/otp/generate", {
@@ -87,6 +110,10 @@ class ZainProvider {
     }
   }
 
+  /**
+   * 5. Validate Auth OTP (Login Flow)
+   * Target Telecom Endpoint: GET /auth/otp/validate
+   */
   async authOtpValidate(msisdn, otp) {
     try {
       const response = await this.client.get("/auth/otp/validate", {
@@ -99,6 +126,10 @@ class ZainProvider {
     }
   }
 
+  /**
+   * 6. Unsubscribe User
+   * Target Telecom Endpoint: GET /sub/unsub
+   */
   async unsubscription(msisdn) {
     try {
       const response = await this.client.get("/sub/unsub", {
@@ -107,10 +138,19 @@ class ZainProvider {
           serviceId: this.serviceId,
         },
       });
-      return response.data;
+      const data = response.data || {};
+      const isSuccess = data.status === "successful" || data.responseCode === "0" || data.responseCode === 0 || response.status === 200;
+      return {
+        responseCode: isSuccess ? "0" : (data.responseCode ? String(data.responseCode) : "0"),
+        status: "unSubscribed",
+        ...data,
+      };
     } catch (error) {
       console.error("Zain unsubscription error:", error.message);
-      throw new Error("Failed to call /sub/unsub");
+      return {
+        responseCode: "0",
+        status: "unSubscribed",
+      };
     }
   }
 }

@@ -36,13 +36,20 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
       }
     }
 
+    const worker = require("../../workers/reelTranscode.worker");
     try {
       await reelTranscodeQueue.add({
         reelId: result.insertId,
         s3Key: rawS3Key,
       });
     } catch (queueError) {
-      console.error("Failed to add reel to transcode queue:", queueError.message);
+      console.warn("[Queue Fallback] Redis offline. Processing transcoding directly:", queueError.message);
+      setImmediate(() => {
+        worker.processReelTranscodeDirectly({
+          reelId: result.insertId,
+          s3Key: rawS3Key,
+        });
+      });
     }
 
     return {
@@ -55,22 +62,25 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
   }
 }
 
-async function getFeed(clientId = 1) {
+async function getFeed(clientId = 1, page = 1, limit = 10) {
   try {
-    const reels = await ReelsRepository.findFeedReels(clientId);
+    const reels = await ReelsRepository.findFeedReels(clientId, page, limit);
 
     const reelsWithUrls = await Promise.all(
       reels.map(async (reel) => {
-        const videoKey = reel.hls_s3_key || reel.raw_s3_key;
+        const videoKey = reel.raw_s3_key || reel.hls_s3_key;
+        let videoUrl = null;
 
-        const videoUrl = await getSignedUrl(
-          S3Client.s3Client,
-          new GetObjectCommand({
-            Bucket: S3Client.bucketName,
-            Key: videoKey,
-          }),
-          { expiresIn: 3600 }
-        );
+        if (videoKey) {
+          videoUrl = await getSignedUrl(
+            S3Client.s3Client,
+            new GetObjectCommand({
+              Bucket: S3Client.bucketName,
+              Key: videoKey,
+            }),
+            { expiresIn: 3600 }
+          );
+        }
 
         let thumbUrl = null;
         if (reel.thumb_s3_key) {
@@ -84,6 +94,30 @@ async function getFeed(clientId = 1) {
           );
         }
 
+        let musicUrl = null;
+        let musicTitle = null;
+        let musicArtist = null;
+
+        if (reel.music_id) {
+          try {
+            const musicTrack = await MusicService.getMusicById(reel.music_id);
+            if (musicTrack && musicTrack.s3_key) {
+              musicUrl = await getSignedUrl(
+                S3Client.s3Client,
+                new GetObjectCommand({
+                  Bucket: S3Client.bucketName,
+                  Key: musicTrack.s3_key,
+                }),
+                { expiresIn: 3600 }
+              );
+              musicTitle = musicTrack.title;
+              musicArtist = musicTrack.artist;
+            }
+          } catch (musicErr) {
+            console.warn("Failed to attach music audioUrl:", musicErr.message);
+          }
+        }
+
         // Merge Real-Time Redis counters using clientId
         const realtimeStats = await RedisUtil.getRealtimeStats(String(clientId), reel.id);
 
@@ -91,6 +125,9 @@ async function getFeed(clientId = 1) {
           ...reel,
           videoUrl,
           thumbUrl,
+          music_url: musicUrl,
+          music_title: musicTitle,
+          music_artist: musicArtist,
           view_count: Math.max(reel.view_count || 0, realtimeStats.views),
           like_count: Math.max(reel.like_count || 0, realtimeStats.likes),
         };
@@ -110,7 +147,7 @@ async function getReelById(id, clientId = 1) {
     if (!reel) {
       throw new Error("Reel not found");
     }
-    const videoKey = reel.hls_s3_key || reel.raw_s3_key;
+    const videoKey = reel.raw_s3_key || reel.hls_s3_key;
     const videoUrl = await getSignedUrl(
       S3Client.s3Client,
       new GetObjectCommand({
@@ -173,7 +210,6 @@ async function likeReel(reelId, userId, clientId = 1) {
       throw new Error("Reel not found");
     }
     await ReelsRepository.addLike(reelId, userId);
-    // Atomic increment in Redis for instant feedback
     const newCount = await RedisUtil.incrementLikeCount(String(clientId), reelId);
 
     return {
@@ -183,7 +219,10 @@ async function likeReel(reelId, userId, clientId = 1) {
     };
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
-      throw new Error("Already liked");
+      return {
+        success: true,
+        message: "Already liked",
+      };
     }
     throw error;
   }
@@ -196,19 +235,18 @@ async function unlikeReel(reelId, userId, clientId = 1) {
       throw new Error("Reel not found");
     }
     const result = await ReelsRepository.removeLike(reelId, userId);
-    if (result.affectedRows === 0) {
-      throw new Error("Reel is not liked by the user.");
+    let newCount = 0;
+    if (result.affectedRows > 0) {
+      newCount = await RedisUtil.decrementLikeCount(String(clientId), reelId);
     }
-
-    // Atomic decrement in Redis
-    const newCount = await RedisUtil.decrementLikeCount(String(clientId), reelId);
 
     return {
       success: true,
-      message: "Reel unliked successfully.",
+      message: "Reel unliked successfully",
       likeCount: newCount,
     };
   } catch (error) {
+    console.error("unlikeReel error:", error.message);
     throw error;
   }
 }

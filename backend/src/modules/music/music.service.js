@@ -105,11 +105,21 @@ async function getTrendingMusic() {
     throw error;
   }
 }
+async function getMusicById(musicId) {
+  try {
+    return await MusicRepository.findMusicById(musicId);
+  } catch (error) {
+    console.error("getMusicById error:", error.message);
+    return null;
+  }
+}
+
 module.exports = {
     getUploadUrlMusic,
     createMusic,
     musicCategories,
     getAllMusic,
     incrementUsageCount,
-    getTrendingMusic
+    getTrendingMusic,
+    getMusicById,
 }
