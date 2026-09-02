@@ -49,9 +49,23 @@ app.get("/", (req, res) => {
 
 // Start Express server if run directly
 if (require.main === module) {
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });
+
+  // Graceful Shutdown Cleanup Handler (PM2 restart / SIGTERM / SIGINT)
+  const RedisUtil = require("./utils/redis.util");
+  const gracefulShutdown = async (signal) => {
+    console.log(`[App] Received ${signal}. Starting graceful shutdown...`);
+    server.close(async () => {
+      console.log("[App] HTTP server closed.");
+      await RedisUtil.closeRedis();
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 module.exports = app;

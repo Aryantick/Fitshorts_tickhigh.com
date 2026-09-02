@@ -1,4 +1,5 @@
 const AuthService = require("./auth.service");
+const dialogAuthService = require("./dialogAuth.service");
 const apiResponse = require("../../utils/apiResponse");
 
 async function refreshToken(req, res) {
@@ -28,7 +29,36 @@ async function logoutUser(req, res) {
     return apiResponse(res, 400, error.message);
   }
 }
+
+async function verifyDialogSync(req, res) {
+  const { encryptedMsisdn } = req.body;
+  const clientId = req.client ? req.client.id : 3;
+
+  if (!encryptedMsisdn) {
+    return apiResponse(res, 400, "encryptedMsisdn is required in body");
+  }
+
+  try {
+    const result = await dialogAuthService.syncDialogUser(encryptedMsisdn, clientId);
+
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    return apiResponse(res, 200, "User verified and synced successfully", {
+      accessToken: result.accessToken,
+      user: result.user,
+    });
+  } catch (error) {
+    console.error("verifyDialogSync Controller Error:", error.message);
+    return apiResponse(res, 400, error.message);
+  }
+}
+
 module.exports = {
   refreshToken,
-  logoutUser
+  logoutUser,
+  verifyDialogSync,
 };
