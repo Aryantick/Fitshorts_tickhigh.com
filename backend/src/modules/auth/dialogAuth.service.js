@@ -16,11 +16,13 @@ async function syncDialogUser(encryptedMsisdn, clientId = 3, options = {}) {
     throw new Error("encryptedMsisdn is required");
   }
 
-  // 1. Check if callback already passed status === "SUCCESS"
-  const isDirectSuccess = options.status === "SUCCESS" || options.status === "ACTIVE";
+  // 1. Check if callback passed status === "SUCCESS" or "PENDING"
+  const isDirectSuccess =
+    options.status === "SUCCESS" ||
+    options.status === "PENDING";
 
   if (!isDirectSuccess) {
-    // Resolve Telecom Provider & verify with Dialog SL gateway if not explicitly SUCCESS
+    // Resolve Telecom Provider & verify with Dialog SL gateway if not explicitly SUCCESS/ACTIVE/PENDING
     let provider;
     try {
       const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
@@ -33,7 +35,7 @@ async function syncDialogUser(encryptedMsisdn, clientId = 3, options = {}) {
     if (options.refId) {
       try {
         const resultRes = await provider.getSubscriptionResult({ refId: options.refId, ...options });
-        if (resultRes.success || resultRes.status === "ACTIVE") {
+        if (resultRes.success || resultRes.status === "ACTIVE" || resultRes.status === "PENDING") {
           checkRes = { success: true };
         }
       } catch (e) {
@@ -66,11 +68,12 @@ async function syncDialogUser(encryptedMsisdn, clientId = 3, options = {}) {
 
   // 5. Upsert subscription state in DB
   try {
+    const subStatus = options.status === "PENDING" ? "pending" : "active";
     await subscriptionRepository.upsertUserSubscription({
       userId,
       clientId,
-      currentStatus: "active",
-      subscriptionStatus: "active",
+      currentStatus: subStatus,
+      subscriptionStatus: subStatus,
       engineTransactionId: `DIALOG_${Date.now()}`,
     });
   } catch (e) {
