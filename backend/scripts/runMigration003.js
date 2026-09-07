@@ -42,6 +42,9 @@ async function runMigration003() {
 
     // 3. Run multi-tenant schema 003
     await executeSqlFile("003_multi_tenant_schema.sql");
+    await executeSqlFile("004_update_reel_schema.sql");
+    await executeSqlFile("005_add_client_id_to_notifications.sql");
+    await executeSqlFile("006_add_dialog_sl_tenant.sql");
     console.log("Created clients, telecom_configs, and user_client_relations tables & default rows.");
 
     // 4. Safely ALTER user_subscriptions
