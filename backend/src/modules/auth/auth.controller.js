@@ -31,15 +31,16 @@ async function logoutUser(req, res) {
 }
 
 async function verifyDialogSync(req, res) {
-  const { encryptedMsisdn } = req.body;
+  const encryptedMsisdn = req.body.encryptedMsisdn || req.body.u || req.query.encryptedMsisdn || req.query.u;
+  const status = req.body.status || req.query.status;
   const clientId = req.client ? req.client.id : 3;
 
   if (!encryptedMsisdn) {
-    return apiResponse(res, 400, "encryptedMsisdn is required in body");
+    return apiResponse(res, 400, "encryptedMsisdn (or 'u') is required");
   }
 
   try {
-    const result = await dialogAuthService.syncDialogUser(encryptedMsisdn, clientId);
+    const result = await dialogAuthService.syncDialogUser(encryptedMsisdn, clientId, { status });
 
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,

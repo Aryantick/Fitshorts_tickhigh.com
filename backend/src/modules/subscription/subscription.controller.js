@@ -40,65 +40,7 @@ async function selectPlan(req, res) {
   }
 }
 
-/**
- * Dialog SL Proxy: Initiate Subscribe
- */
-async function dialogSubscribe(req, res) {
-  try {
-    const clientId = req.client ? req.client.id : 3;
-    const result = await Service.initiateDialogSubscribe(clientId);
-    return res.status(200).json(result.rawData || result);
-  } catch (error) {
-    return apiResponse(res, 500, error.message);
-  }
-}
-
-/**
- * Dialog SL Proxy: Get Subscription Result
- */
-async function dialogSubscriptionResult(req, res) {
-  try {
-    const clientId = req.client ? req.client.id : 3;
-    const result = await Service.getDialogSubscriptionResult(req.query, clientId);
-    return res.status(200).json(result.rawData || result);
-  } catch (error) {
-    return apiResponse(res, 500, error.message);
-  }
-}
-
-/**
- * Dialog SL Proxy: Check Encrypted MSISDN Status
- */
-async function dialogCheckEncryptedMsisdn(req, res) {
-  const { encryptedMsisdn } = req.body || {};
-  try {
-    const clientId = req.client ? req.client.id : 3;
-    const result = await Service.checkDialogEncryptedMsisdn(encryptedMsisdn, clientId);
-    return res.status(200).json(result.rawData || result);
-  } catch (error) {
-    return apiResponse(res, 500, error.message);
-  }
-}
-
-/**
- * Dialog SL Proxy: Unsubscribe User
- */
-async function dialogUnsubscribe(req, res) {
-  const { encryptedMsisdn } = req.body || {};
-  try {
-    const clientId = req.client ? req.client.id : 3;
-    const result = await Service.unsubscribeDialog(encryptedMsisdn, clientId);
-    return res.status(200).json(result.rawData || result);
-  } catch (error) {
-    return apiResponse(res, 500, error.message);
-  }
-}
-
 module.exports = {
   checkMsisdn,
   selectPlan,
-  dialogSubscribe,
-  dialogSubscriptionResult,
-  dialogCheckEncryptedMsisdn,
-  dialogUnsubscribe,
 };

@@ -69,47 +69,7 @@ async function validatePlan(msisdn, subServiceId, clientId = 1) {
   };
 }
 
-/**
- * Service: Dialog SL Initiate Subscribe Proxy
- */
-async function initiateDialogSubscribe(clientId = 3) {
-  const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
-  const provider = telecomFactory.getTelecomProvider(telecomConfig);
-  return await provider.initiateSubscribe();
-}
-
-/**
- * Service: Dialog SL Subscription Result Proxy
- */
-async function getDialogSubscriptionResult(queryParams, clientId = 3) {
-  const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
-  const provider = telecomFactory.getTelecomProvider(telecomConfig);
-  return await provider.getSubscriptionResult(queryParams);
-}
-
-/**
- * Service: Dialog SL Check Encrypted MSISDN Status Proxy
- */
-async function checkDialogEncryptedMsisdn(encryptedMsisdn, clientId = 3) {
-  const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
-  const provider = telecomFactory.getTelecomProvider(telecomConfig);
-  return await provider.checkSub(encryptedMsisdn);
-}
-
-/**
- * Service: Dialog SL Unsubscribe Proxy
- */
-async function unsubscribeDialog(encryptedMsisdn, clientId = 3) {
-  const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
-  const provider = telecomFactory.getTelecomProvider(telecomConfig);
-  return await provider.unsubscribe(encryptedMsisdn);
-}
-
 module.exports = {
   checkMsisdnStatus,
   validatePlan,
-  initiateDialogSubscribe,
-  getDialogSubscriptionResult,
-  checkDialogEncryptedMsisdn,
-  unsubscribeDialog,
 };

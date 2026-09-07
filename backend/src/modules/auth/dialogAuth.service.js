@@ -11,26 +11,29 @@ const bcrypt = require("bcrypt");
 /**
  * Verifies Encrypted MSISDN with Dialog SL Gateway and syncs user state in DB
  */
-async function syncDialogUser(encryptedMsisdn, clientId = 3) {
+async function syncDialogUser(encryptedMsisdn, clientId = 3, options = {}) {
   if (!encryptedMsisdn) {
     throw new Error("encryptedMsisdn is required");
   }
 
-  // 1. Resolve Telecom Provider
-  let provider;
-  try {
-    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
-    provider = telecomFactory.getTelecomProvider(telecomConfig);
-  } catch (e) {
-    // Fallback to default DialogSLProvider instance
-    provider = new DialogSLProvider({});
-  }
+  // 1. Check if callback already passed status === "SUCCESS"
+  const isDirectSuccess = options.status === "SUCCESS" || options.status === "ACTIVE";
 
-  // 2. Check Encrypted MSISDN status with Dialog SL operator
-  const checkRes = await provider.checkSub(encryptedMsisdn);
+  if (!isDirectSuccess) {
+    // Resolve Telecom Provider & verify with Dialog SL gateway if not explicitly SUCCESS
+    let provider;
+    try {
+      const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+      provider = telecomFactory.getTelecomProvider(telecomConfig);
+    } catch (e) {
+      provider = new DialogSLProvider({});
+    }
 
-  if (!checkRes.success) {
-    throw new Error(checkRes.message || "Encrypted MSISDN is not active on Dialog SL");
+    const checkRes = await provider.checkSub(encryptedMsisdn);
+
+    if (!checkRes.success) {
+      throw new Error(checkRes.message || "Encrypted MSISDN is not active on Dialog SL");
+    }
   }
 
   // 3. Find or Create User in users table
@@ -67,7 +70,7 @@ async function syncDialogUser(encryptedMsisdn, clientId = 3) {
   const hashedToken = await bcrypt.hash(refreshToken, 10);
   const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-  await authRepository.createRefreshToken(userId, hashedToken, refreshExpiresAt);
+  await authRepository.saveRefreshToken(userId, hashedToken, refreshExpiresAt);
 
   return {
     accessToken,
