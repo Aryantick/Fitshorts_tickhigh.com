@@ -11,11 +11,16 @@ const port = process.env.PORT || 3000;
 
 // 1. Configure CORS Middleware for cross-origin requests
 app.use((req, res, next) => {
-  const origin = req.headers.origin || "http://localhost:3000";
+  const origin = req.headers.origin || "*";
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-tenant-id, x-client-subdomain, *");
+  
+  // Dynamic or explicit headers - avoiding wildcard '*' when credentials mode is enabled
+  const requestedHeaders = req.headers["access-control-request-headers"];
+  const allowedHeaders = requestedHeaders || "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-tenant-id, x-client-subdomain";
+  res.setHeader("Access-Control-Allow-Headers", allowedHeaders);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -45,6 +50,18 @@ app.use("/api", routes);
 // Health check endpoint
 app.get("/", (req, res) => {
   res.send("Hello World!");
+});
+
+// Global Error Handler ensuring CORS headers are present on server errors
+app.use((err, req, res, next) => {
+  console.error("[Global Error Handler]:", err);
+  const origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error"
+  });
 });
 
 // Start Express server if run directly

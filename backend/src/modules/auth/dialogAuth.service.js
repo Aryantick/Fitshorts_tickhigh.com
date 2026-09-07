@@ -29,7 +29,21 @@ async function syncDialogUser(encryptedMsisdn, clientId = 3, options = {}) {
       provider = new DialogSLProvider({});
     }
 
-    const checkRes = await provider.checkSub(encryptedMsisdn);
+    let checkRes;
+    if (options.refId) {
+      try {
+        const resultRes = await provider.getSubscriptionResult({ refId: options.refId, ...options });
+        if (resultRes.success || resultRes.status === "ACTIVE") {
+          checkRes = { success: true };
+        }
+      } catch (e) {
+        console.warn("getSubscriptionResult failed, falling back to checkSub:", e.message);
+      }
+    }
+
+    if (!checkRes || !checkRes.success) {
+      checkRes = await provider.checkSub(encryptedMsisdn);
+    }
 
     if (!checkRes.success) {
       throw new Error(checkRes.message || "Encrypted MSISDN is not active on Dialog SL");

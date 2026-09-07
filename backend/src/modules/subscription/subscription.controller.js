@@ -40,7 +40,19 @@ async function selectPlan(req, res) {
   }
 }
 
+async function initiateDialogSubscription(req, res) {
+  try {
+    const clientId = req.client ? req.client.id : 3;
+    const { source, medium, campaign } = req.body || {};
+    const result = await Service.initiateDialogSubscribe(clientId, { source, medium, campaign });
+    return apiResponse(res, 200, "Dialog subscription initiated successfully", result);
+  } catch (error) {
+    return apiResponse(res, 500, error.message || "Failed to initiate Dialog subscription");
+  }
+}
+
 module.exports = {
   checkMsisdn,
   selectPlan,
+  initiateDialogSubscription,
 };

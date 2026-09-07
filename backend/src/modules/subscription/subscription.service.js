@@ -69,7 +69,25 @@ async function validatePlan(msisdn, subServiceId, clientId = 1) {
   };
 }
 
+/**
+ * Service: Initiate Dialog SL Gateway Subscription
+ */
+async function initiateDialogSubscribe(clientId = 3, options = {}) {
+  let provider;
+  try {
+    const telecomConfig = await telecomConfigService.getTelecomConfigByClientId(clientId);
+    provider = telecomFactory.getTelecomProvider(telecomConfig);
+  } catch (e) {
+    const DialogSLProvider = require("../../integrations/telecom/providers/dialogsl.provider");
+    provider = new DialogSLProvider({});
+  }
+
+  const { source = "WEB", medium = "WEB", campaign = "WELLNESS360" } = options;
+  return await provider.initiateSubscribe(source, medium, campaign);
+}
+
 module.exports = {
   checkMsisdnStatus,
   validatePlan,
+  initiateDialogSubscribe,
 };
