@@ -124,6 +124,6 @@ async function handleDialogCallback(req, res) {
 module.exports = {
   checkMsisdn,
   selectPlan,
-  initiateDialogSubscription,
+  // initiateDialogSubscription,
   handleDialogCallback,
 };
