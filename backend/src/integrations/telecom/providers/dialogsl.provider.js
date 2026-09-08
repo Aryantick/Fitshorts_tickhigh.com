@@ -103,27 +103,27 @@ class DialogSLProvider {
    * 3. Get Gateway Callback Result
    * Target: GET /api/v1/integration/subscription/result
    */
-  async getSubscriptionResult(queryParams = {}) {
-    try {
-      const response = await this.client.get("/api/v1/integration/subscription/result", {
-        params: queryParams,
-      });
+  // async getSubscriptionResult(queryParams = {}) {
+  //   try {
+  //     const response = await this.client.get("/api/v1/integration/subscription/result", {
+  //       params: queryParams,
+  //     });
 
-      const data = response.data || {};
-      const isSuccess = data.status === "ACTIVE";
+  //     const data = response.data || {};
+  //     const isSuccess = data.status === "ACTIVE";
 
-      return {
-        success: isSuccess,
-        id: data.id,
-        status: data.status,
-        message: data.message || "Subscription verified",
-        rawData: data,
-      };
-    } catch (error) {
-      console.error("DialogSL getSubscriptionResult Error:", error?.response?.data || error.message);
-      throw new Error(error?.response?.data?.message || "Failed to fetch subscription result");
-    }
-  }
+  //     return {
+  //       success: isSuccess,
+  //       id: data.id,
+  //       status: data.status,
+  //       message: data.message || "Subscription verified",
+  //       rawData: data,
+  //     };
+  //   } catch (error) {
+  //     console.error("DialogSL getSubscriptionResult Error:", error?.response?.data || error.message);
+  //     throw new Error(error?.response?.data?.message || "Failed to fetch subscription result");
+  //   }
+  // }
 
   /**
    * 4. Unsubscribe Flow

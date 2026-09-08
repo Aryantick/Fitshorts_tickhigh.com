@@ -40,14 +40,84 @@ async function selectPlan(req, res) {
   }
 }
 
-async function initiateDialogSubscription(req, res) {
+// async function initiateDialogSubscription(req, res) {
+//   try {
+//     const clientId = req.client ? req.client.id : 3;
+//     const { source, medium, campaign } = req.body || {};
+//     const result = await Service.initiateDialogSubscribe(clientId, { source, medium, campaign });
+//     return apiResponse(res, 200, "Dialog subscription initiated successfully", result);
+//   } catch (error) {
+//     return apiResponse(res, 500, error.message || "Failed to initiate Dialog subscription");
+//   }
+// }
+
+/**
+ * Controller: Handle Dialog SL Callback (GET /api/subscription/dialog/callback)
+ */
+async function handleDialogCallback(req, res) {
+  const {
+    u,
+    status,
+    userAuthenticated,
+    refId,
+    opr,
+    omsource,
+    ommedium,
+    omcampaign,
+    encv,
+  } = req.query || {};
+
+  // 1. Validate required parameter `u`
+  if (!u || !String(u).trim()) {
+    return apiResponse(res, 400, "Missing Dialog user identifier");
+  }
+
+  // 2. Validate required callback parameters `status` and `userAuthenticated`
+  if (
+    status === undefined || status === null || String(status).trim() === "" ||
+    userAuthenticated === undefined || userAuthenticated === null || String(userAuthenticated).trim() === ""
+  ) {
+    return apiResponse(res, 400, "Missing required callback parameters: status and userAuthenticated are required");
+  }
+
+  // 3. Normalize status and userAuthenticated
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+
+  if (normalizedStatus !== "PENDING" && normalizedStatus !== "SUCCESS") {
+    return apiResponse(res, 400, "Unsupported subscription status", {
+      status: "UNKNOWN",
+      authenticated: false,
+    });
+  }
+
   try {
     const clientId = req.client ? req.client.id : 3;
-    const { source, medium, campaign } = req.body || {};
-    const result = await Service.initiateDialogSubscribe(clientId, { source, medium, campaign });
-    return apiResponse(res, 200, "Dialog subscription initiated successfully", result);
+    const result = await Service.handleDialogCallback(
+      {
+        u: String(u).trim(),
+        status,
+        userAuthenticated,
+        refId,
+        opr,
+        omsource,
+        ommedium,
+        omcampaign,
+        encv,
+      },
+      clientId
+    );
+
+    if (result.refreshToken) {
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+    }
+
+    return apiResponse(res, 200, result.message || "Callback processed successfully", result);
   } catch (error) {
-    return apiResponse(res, 500, error.message || "Failed to initiate Dialog subscription");
+    return apiResponse(res, 400, error.message || "Failed to process Dialog callback");
   }
 }
 
@@ -55,4 +125,5 @@ module.exports = {
   checkMsisdn,
   selectPlan,
   initiateDialogSubscription,
+  handleDialogCallback,
 };

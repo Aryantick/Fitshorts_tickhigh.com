@@ -30,46 +30,46 @@ async function logoutUser(req, res) {
   }
 }
 
-async function verifyDialogSync(req, res) {
-  const encryptedMsisdn = req.body.encryptedMsisdn || req.body.u || req.query.encryptedMsisdn || req.query.u;
-  const status = req.body.status || req.query.status;
-  const refId = req.body.refId || req.query.refId;
-  const omsource = req.body.omsource || req.query.omsource;
-  const ommedium = req.body.ommedium || req.query.ommedium;
-  const omcampaign = req.body.omcampaign || req.query.omcampaign;
-  const clientId = req.client ? req.client.id : 3;
+// async function verifyDialogSync(req, res) {
+//   const encryptedMsisdn = req.body.encryptedMsisdn || req.body.u || req.query.encryptedMsisdn || req.query.u;
+//   const status = req.body.status || req.query.status;
+//   const refId = req.body.refId || req.query.refId;
+//   const omsource = req.body.omsource || req.query.omsource;
+//   const ommedium = req.body.ommedium || req.query.ommedium;
+//   const omcampaign = req.body.omcampaign || req.query.omcampaign;
+//   const clientId = req.client ? req.client.id : 3;
 
-  if (!encryptedMsisdn) {
-    return apiResponse(res, 400, "encryptedMsisdn (or 'u') is required");
-  }
+//   if (!encryptedMsisdn) {
+//     return apiResponse(res, 400, "encryptedMsisdn (or 'u') is required");
+//   }
 
-  try {
-    const result = await dialogAuthService.syncDialogUser(encryptedMsisdn, clientId, {
-      status,
-      refId,
-      omsource,
-      ommedium,
-      omcampaign,
-    });
+//   try {
+//     const result = await dialogAuthService.syncDialogUser(encryptedMsisdn, clientId, {
+//       status,
+//       refId,
+//       omsource,
+//       ommedium,
+//       omcampaign,
+//     });
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+//     res.cookie("refreshToken", result.refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+//     });
 
-    return apiResponse(res, 200, "User verified and synced successfully", {
-      accessToken: result.accessToken,
-      user: result.user,
-    });
-  } catch (error) {
-    console.error("verifyDialogSync Controller Error:", error.message);
-    return apiResponse(res, 400, error.message);
-  }
-}
+//     return apiResponse(res, 200, "User verified and synced successfully", {
+//       accessToken: result.accessToken,
+//       user: result.user,
+//     });
+//   } catch (error) {
+//     console.error("verifyDialogSync Controller Error:", error.message);
+//     return apiResponse(res, 400, error.message);
+//   }
+// }
 
 module.exports = {
   refreshToken,
   logoutUser,
-  verifyDialogSync,
+  // verifyDialogSync,
 };

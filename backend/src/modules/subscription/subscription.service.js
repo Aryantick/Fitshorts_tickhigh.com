@@ -86,8 +86,95 @@ async function initiateDialogSubscribe(clientId = 3, options = {}) {
   return await provider.initiateSubscribe(source, medium, campaign);
 }
 
+const usersRepository = require("../users/users.repository");
+const clientService = require("../client/client.service");
+const subscriptionRepository = require("./subscription.repository");
+const authRepository = require("../auth/auth.repository");
+const { generateAccessToken, generateRefreshToken } = require("../../utils/jwt");
+const bcrypt = require("bcrypt");
+
+/**
+ * Service: Handle Dialog Sri Lanka Callback Flow
+ * Find/Create User, Record Relation, Upsert Subscription, and Handle Authentication based on Status
+ */
+async function handleDialogCallback(params = {}, clientId = 3) {
+  const { u, status, userAuthenticated, refId } = params;
+
+  if (!u || !String(u).trim()) {
+    throw new Error("Missing Dialog user identifier");
+  }
+
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  const isUserAuthenticated = String(userAuthenticated || "").trim().toLowerCase() === "true";
+
+  // 1. Find or Create User in Reel Backend users table
+  let user = await usersRepository.findByMsisdn(u);
+  if (!user) {
+    const result = await usersRepository.createUser(u);
+    user = { id: result.id, msisdn: u };
+  }
+
+  // 2. Record user-client relation (is_active = 1)
+  await clientService.recordUserClientRelation(user.id, clientId);
+
+  // 3. Process Subscription & Auth according to normalizedStatus
+
+
+  if (normalizedStatus === "SUCCESS" || normalizedStatus === "PENDING") {
+    try {
+      await subscriptionRepository.upsertUserSubscription({
+        userId: user.id,
+        clientId,
+        currentStatus: "active",
+        subscriptionStatus: "active",
+        engineTransactionId: refId ? `DIALOG_${refId}` : `DIALOG_${Date.now()}`,
+      });
+    } catch (e) {
+      console.error("upsertUserSubscription warning:", e.message);
+    }
+
+    if (isUserAuthenticated) {
+      const accessToken = generateAccessToken(user.id, clientId);
+      const refreshToken = generateRefreshToken(user.id, clientId);
+
+      const hashedToken = await bcrypt.hash(refreshToken, 10);
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await authRepository.saveRefreshToken(user.id, hashedToken, refreshExpiresAt);
+
+      return {
+        status: "SUCCESS",
+        authenticated: true,
+        accessToken,
+        refreshToken,
+        message: "Subscription active and user authenticated",
+        user: {
+          id: user.id,
+          encryptedMsisdn: u,
+          clientId,
+        },
+      };
+    }
+
+    return {
+      status: "SUCCESS",
+      authenticated: false,
+      nextStep: "AUTHENTICATION_REQUIRED",
+      message: "User authentication is required",
+      user: {
+        id: user.id,
+        encryptedMsisdn: u,
+        clientId,
+      },
+    };
+  }
+
+  throw new Error("Unsupported subscription status");
+}
+
 module.exports = {
   checkMsisdnStatus,
   validatePlan,
   initiateDialogSubscribe,
+  handleDialogCallback,
 };
