@@ -117,16 +117,15 @@ async function handleDialogCallback(params = {}, clientId = 3) {
   // 2. Record user-client relation (is_active = 1)
   await clientService.recordUserClientRelation(user.id, clientId);
 
-  // 3. Process Subscription & Auth according to normalizedStatus
-
-
+  // 3. Process Subscription & Auth according to normalizedStatus (PENDING and SUCCESS both issue tokens if userAuthenticated === true)
   if (normalizedStatus === "SUCCESS" || normalizedStatus === "PENDING") {
+    const subStatus = normalizedStatus === "PENDING" ? "pending" : "active";
     try {
       await subscriptionRepository.upsertUserSubscription({
         userId: user.id,
         clientId,
-        currentStatus: "active",
-        subscriptionStatus: "active",
+        currentStatus: subStatus,
+        subscriptionStatus: subStatus,
         engineTransactionId: refId ? `DIALOG_${refId}` : `DIALOG_${Date.now()}`,
       });
     } catch (e) {
@@ -143,11 +142,11 @@ async function handleDialogCallback(params = {}, clientId = 3) {
       await authRepository.saveRefreshToken(user.id, hashedToken, refreshExpiresAt);
 
       return {
-        status: "SUCCESS",
+        status: normalizedStatus,
         authenticated: true,
         accessToken,
         refreshToken,
-        message: "Subscription active and user authenticated",
+        message: "Subscription processed and user authenticated",
         user: {
           id: user.id,
           encryptedMsisdn: u,
@@ -157,7 +156,7 @@ async function handleDialogCallback(params = {}, clientId = 3) {
     }
 
     return {
-      status: "SUCCESS",
+      status: normalizedStatus,
       authenticated: false,
       nextStep: "AUTHENTICATION_REQUIRED",
       message: "User authentication is required",

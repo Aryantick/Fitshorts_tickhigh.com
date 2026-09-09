@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin || "*";
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  
+
   // Dynamic or explicit headers - avoiding wildcard '*' when credentials mode is enabled
   const requestedHeaders = req.headers["access-control-request-headers"];
   const allowedHeaders = requestedHeaders || "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-tenant-id, x-client-subdomain";
@@ -68,6 +68,17 @@ app.use((err, req, res, next) => {
 if (require.main === module) {
   const server = app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
+
+    // In local development, auto-start transcoding and counter-sync workers so everything works in one terminal
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        require("./workers/reelTranscode.worker");
+        require("./workers/sync-counters.worker");
+        console.log("[Local Dev] Background workers (Transcoder & Sync Counters) initialized.");
+      } catch (err) {
+        console.warn("[Local Dev] Warning initializing workers:", err.message);
+      }
+    }
   });
 
   // Graceful Shutdown Cleanup Handler (PM2 restart / SIGTERM / SIGINT)
