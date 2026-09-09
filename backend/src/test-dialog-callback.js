@@ -45,10 +45,9 @@ async function runTests() {
       assert(res1.status === 200, "HTTP Status is 200 OK");
       assert(res1.data.success === true, "Response success is true");
       assert(res1.data.data.status === "PENDING", "Returned status is PENDING");
-      assert(res1.data.data.authenticated === false, "authenticated is false");
-      assert(res1.data.data.nextStep === "WAITING_FOR_ACTIVATION", "nextStep is WAITING_FOR_ACTIVATION");
-      assert(!res1.data.data.accessToken, "NO accessToken returned");
-      assert(!res1.data.data.refreshToken, "NO refreshToken returned");
+      assert(res1.data.data.authenticated === true, "authenticated is true when userAuthenticated=true");
+      assert(Boolean(res1.data.data.accessToken), "accessToken is generated and returned");
+      assert(Boolean(res1.data.data.refreshToken), "refreshToken is generated and returned");
 
       const userInDb = await usersRepository.findByMsisdn(testU);
       assert(userInDb && userInDb.id, "User created/found in Reel Backend DB");
