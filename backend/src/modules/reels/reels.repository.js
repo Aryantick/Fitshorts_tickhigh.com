@@ -3,7 +3,7 @@ const { REEL_STATUS } = require("../../constants/enums");
 
 async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
   const [result] = await pool.query(
-    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, music_id, client_id, status) VALUES (?,?,?,?,?,?,?,?)",
+    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, music_id, client_id, status, view_count, like_count) VALUES (?,?,?,?,?,?,?,?, 0, 0)",
     [userId, title, description, rawS3Key, category, musicId || null, clientId, REEL_STATUS.PENDING_REVIEW]
   );
   console.log("RAW queryResult:", result);

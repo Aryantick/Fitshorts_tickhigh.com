@@ -6,9 +6,9 @@ const MusicService = require("../music/music.service");
 const reelTranscodeQueue = require("../../queues/reelTranscode.queue");
 const RedisUtil = require("../../utils/redis.util");
 
-async function getUploadUrl(userId, fileExtension) {
+async function getUploadUrl(userId, fileExtension, clientId = 1) {
   try {
-    const result = await S3Client.generateUploadUrl(userId, fileExtension);
+    const result = await S3Client.generateUploadUrl(userId, fileExtension, clientId);
     return result;
   } catch (error) {
     console.error("getUploadUrl error:", error.message);
@@ -41,6 +41,7 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
       await reelTranscodeQueue.add({
         reelId: result.insertId,
         s3Key: rawS3Key,
+        clientId,
       });
     } catch (queueError) {
       console.warn("[Queue Fallback] Redis offline. Processing transcoding directly:", queueError.message);
@@ -48,6 +49,7 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
         worker.processReelTranscodeDirectly({
           reelId: result.insertId,
           s3Key: rawS3Key,
+          clientId,
         });
       });
     }
