@@ -117,8 +117,8 @@ async function handleDialogCallback(params = {}, clientId = 3) {
   // 2. Record user-client relation (is_active = 1)
   await clientService.recordUserClientRelation(user.id, clientId);
 
-  // 3. Process Subscription & Auth according to normalizedStatus (PENDING and SUCCESS both issue tokens if userAuthenticated === true)
-  if (normalizedStatus === "SUCCESS" || normalizedStatus === "PENDING") {
+  // 3. Process Subscription & Auth according to normalizedStatus (ACTIVE and PENDING)
+  if (normalizedStatus === "ACTIVE" || normalizedStatus === "PENDING") {
     const subStatus = normalizedStatus === "PENDING" ? "pending" : "active";
     try {
       await subscriptionRepository.upsertUserSubscription({

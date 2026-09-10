@@ -83,7 +83,14 @@ async function handleDialogCallback(req, res) {
   // 3. Normalize status and userAuthenticated
   const normalizedStatus = String(status || "").trim().toUpperCase();
 
-  if (normalizedStatus !== "PENDING" && normalizedStatus !== "SUCCESS") {
+  if (normalizedStatus === "ERROR") {
+    return apiResponse(res, 400, "Some error occurred", {
+      status: "ERROR",
+      authenticated: false,
+    });
+  }
+
+  if (normalizedStatus !== "ACTIVE" && normalizedStatus !== "PENDING") {
     return apiResponse(res, 400, "Unsupported subscription status", {
       status: "UNKNOWN",
       authenticated: false,

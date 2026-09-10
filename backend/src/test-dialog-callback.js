@@ -28,10 +28,10 @@ async function runTests() {
 
   try {
     // ---------------------------------------------------------
-    // TEST 1: status=PENDING, userAuthenticated=true, u exists
+    // TEST 1: status=PENDING, userAuthenticated=true, u exists (User Creation)
     // ---------------------------------------------------------
     console.log("---------------------------------------------------------");
-    console.log("Test 1: status=PENDING, userAuthenticated=true, u exists");
+    console.log("Test 1: status=PENDING, userAuthenticated=true, u exists (Creates user)");
     try {
       const res1 = await axios.get(baseUrl, {
         params: {
@@ -58,15 +58,15 @@ async function runTests() {
     }
 
     // ---------------------------------------------------------
-    // TEST 2: status=SUCCESS, userAuthenticated=true, u exists
+    // TEST 2: status=ACTIVE, userAuthenticated=true, u exists (User Creation & Activation)
     // ---------------------------------------------------------
     console.log("\n---------------------------------------------------------");
-    console.log("Test 2: status=SUCCESS, userAuthenticated=true, u exists");
+    console.log("Test 2: status=ACTIVE, userAuthenticated=true, u exists");
     try {
       const res2 = await axios.get(baseUrl, {
         params: {
           u: testU,
-          status: "SUCCESS",
+          status: "ACTIVE",
           userAuthenticated: "true",
           refId: "ref1002",
         },
@@ -74,7 +74,7 @@ async function runTests() {
 
       assert(res2.status === 200, "HTTP Status is 200 OK");
       assert(res2.data.success === true, "Response success is true");
-      assert(res2.data.data.status === "SUCCESS", "Returned status is SUCCESS");
+      assert(res2.data.data.status === "ACTIVE", "Returned status is ACTIVE");
       assert(res2.data.data.authenticated === true, "authenticated is true");
       assert(Boolean(res2.data.data.accessToken), "accessToken is generated and returned");
       assert(Boolean(res2.data.data.refreshToken), "refreshToken is generated and returned");
@@ -87,16 +87,16 @@ async function runTests() {
     }
 
     // ---------------------------------------------------------
-    // TEST 3: status=SUCCESS, userAuthenticated=false, u exists
+    // TEST 3: status=ACTIVE, userAuthenticated=false, u exists
     // ---------------------------------------------------------
     console.log("\n---------------------------------------------------------");
-    console.log("Test 3: status=SUCCESS, userAuthenticated=false, u exists");
+    console.log("Test 3: status=ACTIVE, userAuthenticated=false, u exists");
     try {
       const testU3 = `${testU}_3`;
       const res3 = await axios.get(baseUrl, {
         params: {
           u: testU3,
-          status: "SUCCESS",
+          status: "ACTIVE",
           userAuthenticated: "false",
           refId: "ref1003",
         },
@@ -104,7 +104,7 @@ async function runTests() {
 
       assert(res3.status === 200, "HTTP Status is 200 OK");
       assert(res3.data.success === true, "Response success is true");
-      assert(res3.data.data.status === "SUCCESS", "Returned status is SUCCESS");
+      assert(res3.data.data.status === "ACTIVE", "Returned status is ACTIVE");
       assert(res3.data.data.authenticated === false, "authenticated is false");
       assert(res3.data.data.nextStep === "AUTHENTICATION_REQUIRED", "nextStep is AUTHENTICATION_REQUIRED");
       assert(!res3.data.data.accessToken, "NO accessToken returned");
@@ -118,77 +118,83 @@ async function runTests() {
     }
 
     // ---------------------------------------------------------
-    // TEST 4: status=PENDING, u missing
+    // TEST 4: status=ERROR -> Must return error response, NO user created
     // ---------------------------------------------------------
     console.log("\n---------------------------------------------------------");
-    console.log("Test 4: status=PENDING, u missing");
+    console.log("Test 4: status=ERROR (Must return error and NOT create user)");
+    const testUError = `TEST_DIALOG_ERR_${Date.now()}`;
     try {
       await axios.get(baseUrl, {
         params: {
-          status: "PENDING",
+          u: testUError,
+          status: "ERROR",
           userAuthenticated: "true",
+          refId: "ref1004",
         },
       });
-      console.error("  ❌ FAIL: Expected HTTP 400 for missing u");
+      console.error("  ❌ FAIL: Expected HTTP 400 for status=ERROR");
       failedCount++;
     } catch (err) {
-      assert(err.response?.status === 400, "Returns HTTP 400");
+      assert(err.response?.status === 400, "Returns HTTP 400 for status=ERROR");
       assert(err.response?.data?.success === false, "Response success is false");
-      assert(err.response?.data?.message === "Missing Dialog user identifier", "Correct error message returned");
+      assert(err.response?.data?.message === "Some error occurred", "Returns 'Some error occurred' message");
+
+      const userInDbError = await usersRepository.findByMsisdn(testUError);
+      assert(!userInDbError, "NO user created in database for status=ERROR");
     }
 
     // ---------------------------------------------------------
-    // TEST 5: status=SUCCESS, u missing
+    // TEST 5: status=SUCCESS or unknown status -> Unsupported
     // ---------------------------------------------------------
     console.log("\n---------------------------------------------------------");
-    console.log("Test 5: status=SUCCESS, u missing");
-    try {
-      await axios.get(baseUrl, {
-        params: {
-          status: "SUCCESS",
-          userAuthenticated: "true",
-        },
-      });
-      console.error("  ❌ FAIL: Expected HTTP 400 for missing u");
-      failedCount++;
-    } catch (err) {
-      assert(err.response?.status === 400, "Returns HTTP 400");
-      assert(err.response?.data?.success === false, "Response success is false");
-      assert(err.response?.data?.message === "Missing Dialog user identifier", "Correct error message returned");
-    }
-
-    // ---------------------------------------------------------
-    // TEST 6: unsupported status
-    // ---------------------------------------------------------
-    console.log("\n---------------------------------------------------------");
-    console.log("Test 6: unsupported status");
+    console.log("Test 5: status=SUCCESS (Unsupported for Dialog flow)");
     try {
       await axios.get(baseUrl, {
         params: {
           u: testU,
-          status: "CANCELLED",
+          status: "SUCCESS",
           userAuthenticated: "true",
         },
       });
-      console.error("  ❌ FAIL: Expected HTTP 400 for unsupported status");
+      console.error("  ❌ FAIL: Expected HTTP 400 for status=SUCCESS");
+      failedCount++;
+    } catch (err) {
+      assert(err.response?.status === 400, "Returns HTTP 400 for status=SUCCESS");
+      assert(err.response?.data?.success === false, "Response success is false");
+      assert(err.response?.data?.message === "Unsupported subscription status", "Returns unsupported status message");
+    }
+
+    // ---------------------------------------------------------
+    // TEST 6: Missing required u parameter
+    // ---------------------------------------------------------
+    console.log("\n---------------------------------------------------------");
+    console.log("Test 6: Missing required u parameter");
+    try {
+      await axios.get(baseUrl, {
+        params: {
+          status: "ACTIVE",
+          userAuthenticated: "true",
+        },
+      });
+      console.error("  ❌ FAIL: Expected HTTP 400 for missing u");
       failedCount++;
     } catch (err) {
       assert(err.response?.status === 400, "Returns HTTP 400");
       assert(err.response?.data?.success === false, "Response success is false");
-      assert(err.response?.data?.message === "Unsupported subscription status", "Correct error message returned");
+      assert(err.response?.data?.message === "Missing Dialog user identifier", "Correct error message returned");
     }
 
     // ---------------------------------------------------------
-    // TEST 7: Send the same SUCCESS callback twice (Idempotency)
+    // TEST 7: Send the same ACTIVE callback twice (Idempotency)
     // ---------------------------------------------------------
     console.log("\n---------------------------------------------------------");
-    console.log("Test 7: Send the same SUCCESS callback twice (Idempotency)");
+    console.log("Test 7: Send the same ACTIVE callback twice (Idempotency)");
     try {
       const testU7 = `${testU}_7`;
       const res7a = await axios.get(baseUrl, {
         params: {
           u: testU7,
-          status: "SUCCESS",
+          status: "ACTIVE",
           userAuthenticated: "true",
           refId: "ref1007",
         },
@@ -199,7 +205,7 @@ async function runTests() {
       const res7b = await axios.get(baseUrl, {
         params: {
           u: testU7,
-          status: "SUCCESS",
+          status: "ACTIVE",
           userAuthenticated: "true",
           refId: "ref1007",
         },
