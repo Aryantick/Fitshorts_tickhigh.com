@@ -1,3 +1,4 @@
 commend/
 node_modules/
 .env
+logs/

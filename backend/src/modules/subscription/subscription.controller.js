@@ -15,6 +15,17 @@ async function checkMsisdn(req, res) {
   try {
     const clientId = req.client ? req.client.id : 1;
     const result = await Service.checkMsisdnStatus(msisdn, clientId);
+
+    if (result.refreshToken) {
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+      delete result.refreshToken;
+    }
+
     return apiResponse(res, 200, "MSISDN status checked successfully", result);
   } catch (error) {
     return apiResponse(res, 500, error.message || "Something went wrong");

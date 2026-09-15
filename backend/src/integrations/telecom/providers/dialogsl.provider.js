@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { attachTelecomLogger } = require("../../../utils/telecomLogger");
 
 /**
  * Telecom Provider for Wellness360 Sri Lanka (Dialog SL DCB Integration)
@@ -21,6 +22,8 @@ class DialogSLProvider {
     this.serviceId = extra.serviceId || 153;
     this.appId = extra.appId || 3876;
     this.packId = extra.packId || 136416;
+    this.subdomain = config.subdomain || "dialogsl";
+    this.clientId = config.client_id || 3;
 
     this.client = axios.create({
       baseURL: this.baseUrl,
@@ -29,6 +32,12 @@ class DialogSLProvider {
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
+    });
+
+    attachTelecomLogger(this.client, {
+      provider: "DIALOG_SL",
+      clientSubdomain: this.subdomain,
+      clientId: this.clientId,
     });
   }
 
@@ -50,6 +59,8 @@ class DialogSLProvider {
 
       const response = await this.client.post("/api/v1/subscriptions/encrypt-msisdn", {
         encryptedMsisdn: encryptedMsisdn,
+      }, {
+        metadata: { action: "checkSub", msisdn: encryptedMsisdn },
       });
 
       const data = response.data || {};
@@ -85,6 +96,8 @@ class DialogSLProvider {
         source,
         medium,
         campaign,
+      }, {
+        metadata: { action: "initiateSubscribe" },
       });
 
       const data = response.data || {};
@@ -100,32 +113,6 @@ class DialogSLProvider {
   }
 
   /**
-   * 3. Get Gateway Callback Result
-   * Target: GET /api/v1/integration/subscription/result
-   */
-  // async getSubscriptionResult(queryParams = {}) {
-  //   try {
-  //     const response = await this.client.get("/api/v1/integration/subscription/result", {
-  //       params: queryParams,
-  //     });
-
-  //     const data = response.data || {};
-  //     const isSuccess = data.status === "ACTIVE";
-
-  //     return {
-  //       success: isSuccess,
-  //       id: data.id,
-  //       status: data.status,
-  //       message: data.message || "Subscription verified",
-  //       rawData: data,
-  //     };
-  //   } catch (error) {
-  //     console.error("DialogSL getSubscriptionResult Error:", error?.response?.data || error.message);
-  //     throw new Error(error?.response?.data?.message || "Failed to fetch subscription result");
-  //   }
-  // }
-
-  /**
    * 4. Unsubscribe Flow
    * Target: POST /api/v1/integration/unsubscribe
    */
@@ -133,6 +120,8 @@ class DialogSLProvider {
     try {
       const response = await this.client.post("/api/v1/integration/unsubscribe", {
         encryptedMsisdn,
+      }, {
+        metadata: { action: "unsubscribe", msisdn: encryptedMsisdn },
       });
 
       const data = response.data || {};

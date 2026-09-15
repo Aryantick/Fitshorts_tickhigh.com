@@ -1,10 +1,18 @@
 const telecomConfigService = require("../telecomConfig/telecomConfig.service");
 const telecomFactory = require("../../integrations/telecom/telecomFactory");
 const telecomMapper = require("../../integrations/telecom/telecom.mapper");
+const usersRepository = require("../users/users.repository");
+const clientService = require("../client/client.service");
+const subscriptionRepository = require("./subscription.repository");
+const authRepository = require("../auth/auth.repository");
+const { generateAccessToken, generateRefreshToken } = require("../../utils/jwt");
+const bcrypt = require("bcrypt");
 
 /**
  * Service: Check MSISDN Status from Telecom Gateway
  * Resolves telecom provider for clientId and queries current subscription status (active, unsub, pending, etc.)
+ * If telecom operator reports active subscriber, automatically creates user, records client relation,
+ * upserts subscription state, and generates authentication tokens for seamless direct access.
  */
 async function checkMsisdnStatus(msisdn, clientId = 1) {
   try {
@@ -19,6 +27,60 @@ async function checkMsisdnStatus(msisdn, clientId = 1) {
 
     const currentStatus = res.data?.currentStatus;
     const subscriptionStatus = res.data?.subscriptionStatus;
+    const extraConfig = telecomConfig?.extra_config || {};
+    const directAccessEnabled = Boolean(extraConfig.directAccess || extraConfig.seamlessLogin);
+
+    // Direct Access: Only if active AND tenant config has directAccess = true
+    if (currentStatus === "active" && directAccessEnabled) {
+      let user = await usersRepository.findByMsisdn(msisdn);
+      let userId;
+      if (!user) {
+        const result = await usersRepository.createUser(msisdn);
+        userId = result.id || result.insertId;
+      } else {
+        userId = user.id;
+      }
+
+      // Record active tenant relation in user_client_relations
+      await clientService.recordUserClientRelation(userId, clientId);
+
+      // Record active subscription state in user_subscriptions
+      try {
+        const items = res.data?.items || [];
+        const firstItem = items[0] || {};
+        const engineTxnId = firstItem.subscriptionUuid || firstItem.id
+          ? String(firstItem.subscriptionUuid || firstItem.id)
+          : null;
+
+        await subscriptionRepository.upsertUserSubscription({
+          userId,
+          clientId,
+          currentStatus: "active",
+          subscriptionStatus: "active",
+          engineTransactionId: engineTxnId,
+        });
+      } catch (subErr) {
+        console.warn("upsertUserSubscription warning in checkMsisdnStatus:", subErr.message);
+      }
+
+      // Generate Access & Refresh tokens
+      const accessToken = generateAccessToken(userId, clientId);
+      const refreshToken = generateRefreshToken(userId, clientId);
+
+      const hashedToken = await bcrypt.hash(refreshToken, 10);
+      const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await authRepository.saveRefreshToken(userId, hashedToken, refreshExpiresAt);
+
+      return {
+        currentStatus: "active",
+        subscriptionStatus: "ACTIVE",
+        nextStep: "DIRECT_ACCESS",
+        accessToken,
+        refreshToken,
+        user: { id: userId, msisdn },
+      };
+    }
+
     const nextStep = telecomMapper.resolveNextStep(currentStatus);
 
     return {
@@ -85,13 +147,6 @@ async function initiateDialogSubscribe(clientId = 3, options = {}) {
   const { source = "WEB", medium = "WEB", campaign = "WELLNESS360" } = options;
   return await provider.initiateSubscribe(source, medium, campaign);
 }
-
-const usersRepository = require("../users/users.repository");
-const clientService = require("../client/client.service");
-const subscriptionRepository = require("./subscription.repository");
-const authRepository = require("../auth/auth.repository");
-const { generateAccessToken, generateRefreshToken } = require("../../utils/jwt");
-const bcrypt = require("bcrypt");
 
 /**
  * Service: Handle Dialog Sri Lanka Callback Flow
