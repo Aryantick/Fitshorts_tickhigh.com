@@ -4,11 +4,12 @@ const ReelService = require("./reels.service");
 async function getUploadUrl(req, res) {
   const { fileExtension } = req.query;
   const userId = req.user.userId;
+  const clientId = req.client ? req.client.id : 1;
   if (!fileExtension) {
     return apiResponse(res, 400, "fileExtension is required");
   }
   try {
-    const result = await ReelService.getUploadUrl(userId, fileExtension);
+    const result = await ReelService.getUploadUrl(userId, fileExtension, clientId);
     return apiResponse(res, 200, "Upload URL generated", result);
   } catch (error) {
     return apiResponse(res, 400, error.message);

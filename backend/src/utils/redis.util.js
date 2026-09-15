@@ -105,6 +105,34 @@ async function invalidateTenantConfig(domain) {
   await redis.del(key);
 }
 
+/**
+ * Clear/Flush Cache for a specific tenant
+ */
+async function flushTenantCache(tenantId) {
+  try {
+    const pattern = getTenantKey(tenantId, "*", "*");
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(keys);
+      console.log(`[Redis Cleanup] Flushed ${keys.length} keys for tenant: ${tenantId}`);
+    }
+  } catch (err) {
+    console.error(`[Redis Cleanup Error] Failed to flush tenant cache:`, err.message);
+  }
+}
+
+/**
+ * Graceful Connection Cleanup & Disconnect
+ */
+async function closeRedis() {
+  try {
+    await redis.quit();
+    console.log("[Redis Cleanup] Connection gracefully closed.");
+  } catch (err) {
+    console.error("[Redis Cleanup Error] Failed to close connection:", err.message);
+  }
+}
+
 module.exports = {
   redis,
   getTenantKey,
@@ -115,4 +143,6 @@ module.exports = {
   cacheTenantConfig,
   getTenantConfig,
   invalidateTenantConfig,
+  flushTenantCache,
+  closeRedis,
 };

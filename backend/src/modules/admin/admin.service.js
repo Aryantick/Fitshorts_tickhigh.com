@@ -155,6 +155,7 @@ async function approveReel(id, adminId) {
         id,
         "reel_approved",
         `Your reel ${reel.title} has been approved and is now live`,
+        reel.client_id || 1,
       );
     } catch (notificationError) {
       console.error("Failed to send reel approval notification", notificationError);
@@ -182,6 +183,7 @@ async function rejectedReel(id, adminId, reason) {
         id,
         "reel_rejected",
         `Your reel ${reel.title} was rejected. Reason: ${reason}`,
+        reel.client_id || 1,
       );
     } catch (notificationError) {
       console.error("Failed to send reel rejected notification", notificationError);
@@ -209,6 +211,7 @@ async function deleteReel(id, adminId, reason) {
         id,
         "reel_deleted",
         `Your reel ${reel.title} was deleted. Reason: ${reason}`,
+        reel.client_id || 1,
       );
     } catch (notificationError) {
       console.error("Failed to send reel deleted notification", notificationError);
