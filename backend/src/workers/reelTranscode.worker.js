@@ -21,13 +21,30 @@ if (!fs.existsSync(TEMP_DIR)) {
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
-async function processReelTranscode({ reelId, s3Key }) {
-  const rawLocalPath = path.join(TEMP_DIR, `${reelId}_raw.mp4`);
+async function processReelTranscode({ reelId, s3Key, clientId }) {
+  let targetClientId = clientId;
+  if (!targetClientId) {
+    const match = s3Key && s3Key.match(/^clients\/client_(\d+)\//);
+    if (match) {
+      targetClientId = Number(match[1]);
+    } else {
+      try {
+        const reel = await ReelsRepository.findReelById(reelId);
+        targetClientId = reel?.client_id || 1;
+      } catch (e) {
+        targetClientId = 1;
+      }
+    }
+  }
+
+  const clientFolder = `clients/client_${targetClientId}`;
+  const ext = path.extname(s3Key) || ".mp4";
+  const rawLocalPath = path.join(TEMP_DIR, `${reelId}_raw${ext}`);
   const thumbLocalPath = path.join(TEMP_DIR, `${reelId}_thumb.jpg`);
   const hlsOutputDir = path.join(TEMP_DIR, `${reelId}_hls`);
 
   try {
-    console.log(`[Transcoder] Processing reel ${reelId}...`);
+    console.log(`[Transcoder] Processing reel ${reelId} for client ${targetClientId}...`);
 
     // Step 1: Download raw video from S3
     await S3Client.downloadFile(s3Key, rawLocalPath);
@@ -42,12 +59,12 @@ async function processReelTranscode({ reelId, s3Key }) {
     
     await generateHLS(rawLocalPath, hlsOutputDir);
 
-    // Step 4: Upload thumbnail to S3
-    const thumbS3Key = `thumbnails/${reelId}/thumb.jpg`;
+    // Step 4: Upload thumbnail to S3 under client folder
+    const thumbS3Key = `${clientFolder}/thumbnails/${reelId}/thumb.jpg`;
     await S3Client.uploadFile(thumbLocalPath, thumbS3Key, "image/jpeg");
 
-    // Step 5: Upload HLS files to S3
-    const hlsS3Key = await uploadHLSFolder(hlsOutputDir, reelId);
+    // Step 5: Upload HLS files to S3 under client folder
+    const hlsS3Key = await uploadHLSFolder(hlsOutputDir, reelId, clientFolder);
 
     // Step 6: Update DB
     await ReelsRepository.updateTranscodingResult(reelId, {
@@ -87,6 +104,10 @@ module.exports = {
 function generateThumbnail(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
+      .outputOptions([
+        "-map 0:v:0",
+        "-dn",
+      ])
       .screenshots({
         timestamps: ["1"],
         filename: path.basename(outputPath),
@@ -108,6 +129,9 @@ function generateHLS(inputPath, outputDir) {
       // 360p Stream (Optimized for Low Mobile Networks)
       .output(p360)
       .outputOptions([
+        "-map 0:v:0",
+        "-map 0:a:0?",
+        "-dn",
         "-vf scale=-2:360,format=yuv420p",
         "-c:v libx264",
         "-b:v 800k",
@@ -123,6 +147,9 @@ function generateHLS(inputPath, outputDir) {
       // 480p Stream (Medium Mobile Network)
       .output(p480)
       .outputOptions([
+        "-map 0:v:0",
+        "-map 0:a:0?",
+        "-dn",
         "-vf scale=-2:480,format=yuv420p",
         "-c:v libx264",
         "-b:v 1400k",
@@ -138,6 +165,9 @@ function generateHLS(inputPath, outputDir) {
       // 720p Stream (HD)
       .output(p720)
       .outputOptions([
+        "-map 0:v:0",
+        "-map 0:a:0?",
+        "-dn",
         "-vf scale=-2:720,format=yuv420p",
         "-c:v libx264",
         "-b:v 2800k",
@@ -169,9 +199,9 @@ function generateHLS(inputPath, outputDir) {
   });
 }
 
-async function uploadHLSFolder(hlsOutputDir, reelId) {
+async function uploadHLSFolder(hlsOutputDir, reelId, clientFolder) {
   const files = fs.readdirSync(hlsOutputDir);
-  const s3BaseKey = `hls/${reelId}`;
+  const s3BaseKey = clientFolder ? `${clientFolder}/hls/${reelId}` : `hls/${reelId}`;
 
   for (const file of files) {
     const localFilePath = path.join(hlsOutputDir, file);

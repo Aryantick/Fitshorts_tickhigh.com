@@ -12,8 +12,8 @@ const s3Client = new S3Client({
   },
 });
 
-async function generateUploadUrl(userId, fileExtension) {
-  const key = `uploads/${userId}/${uuidv4()}.${fileExtension}`;
+async function generateUploadUrl(userId, fileExtension, clientId = 1) {
+  const key = `clients/client_${clientId}/uploads/${userId}/${uuidv4()}.${fileExtension}`;
 
   const command = new PutObjectCommand({
     Bucket: s3Config.bucketName,

@@ -40,8 +40,10 @@ async function runMigration003() {
     // 2. Run update schema 002 if needed
     await executeSqlFile("002_update_schema.sql");
 
-    // 3. Run multi-tenant schema 003
+    // 3. Run multi-tenant schema 003, dialog SL tenant 006, and msisdn size fix 007
     await executeSqlFile("003_multi_tenant_schema.sql");
+    await executeSqlFile("006_add_dialog_sl_tenant.sql");
+    await executeSqlFile("007_expand_msisdn_column.sql");
     console.log("Created clients, telecom_configs, and user_client_relations tables & default rows.");
 
     // 4. Safely ALTER user_subscriptions

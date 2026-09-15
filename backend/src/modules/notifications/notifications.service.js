@@ -1,12 +1,13 @@
 const NotifactionRep = require("./notifications.repository");
 
-async function createNotification(userId, reelId, type, message) {
+async function createNotification(userId, reelId, type, message, clientId = 1) {
   try {
     const result = await NotifactionRep.createNotification(
       userId,
       reelId,
       type,
       message,
+      clientId,
     );
     return result;
   } catch (error) {
@@ -15,9 +16,9 @@ async function createNotification(userId, reelId, type, message) {
   }
 }
 
-async function getByNotifacition(userId) {
+async function getByNotifacition(userId, clientId = 1) {
   try {
-    const notifaction = await NotifactionRep.findNotificationsByUserId(userId);
+    const notifaction = await NotifactionRep.findNotificationsByUserId(userId, clientId);
     return notifaction;
   } catch (error) {
     console.error("getMyNotifications error:", error.message);
@@ -25,9 +26,9 @@ async function getByNotifacition(userId) {
   }
 }
 
-async function markNotificationAsRead(notificationId, userId) {
+async function markNotificationAsRead(notificationId, userId, clientId = 1) {
   try {
-    const result = await NotifactionRep.markAsRead(notificationId, userId);
+    const result = await NotifactionRep.markAsRead(notificationId, userId, clientId);
     if (result.affectedRows === 0) {
       throw new Error("Notification not found or you are not authorized to update it");
     }
@@ -38,9 +39,9 @@ async function markNotificationAsRead(notificationId, userId) {
   }
 }
 
-async function getUnreadCount(userId) {
+async function getUnreadCount(userId, clientId = 1) {
   try {
-    const count = await NotifactionRep.getUnreadCount(userId);
+    const count = await NotifactionRep.getUnreadCount(userId, clientId);
     return { count };
   } catch (error) {
     console.error("getUnreadCount error:", error.message);
@@ -48,9 +49,9 @@ async function getUnreadCount(userId) {
   }
 }
 
-async function markAllAsRead(userId) {
+async function markAllAsRead(userId, clientId = 1) {
   try {
-    const result = await NotifactionRep.markAllAsRead(userId);
+    const result = await NotifactionRep.markAllAsRead(userId, clientId);
     return result;
   } catch (error) {
     console.error("markAllAsRead error:", error.message);
@@ -58,11 +59,12 @@ async function markAllAsRead(userId) {
   }
 }
 
-async function deleteNotification(notificationId, userId) {
+async function deleteNotification(notificationId, userId, clientId = 1) {
   try {
     const result = await NotifactionRep.deleteNotification(
       notificationId,
       userId,
+      clientId,
     );
     if (result.affectedRows === 0) {
       throw new Error(
@@ -79,8 +81,10 @@ async function deleteNotification(notificationId, userId) {
 module.exports = {
   createNotification,
   getByNotifacition,
+  getByNotification: getByNotifacition,
   markNotificationAsRead,
   getUnreadCount,
   markAllAsRead,
   deleteNotification,
 };
+
