@@ -6,14 +6,14 @@ const apiResponse = require("../../utils/apiResponse");
  * Triggers subscription OTP send request to the resolved tenant telecom gateway
  */
 async function sendOtp(req, res) {
-  const { msisdn, subServiceId } = req.body || {};
+  const { msisdn, subServiceId, purchaseTypeId } = req.body || {};
   if (!msisdn) {
     return apiResponse(res, 400, "msisdn is required");
   }
 
   try {
     const clientId = req.client ? req.client.id : 1;
-    const effectiveSubServiceId = subServiceId || 1;
+    const effectiveSubServiceId = subServiceId || purchaseTypeId || (clientId === 4 ? 2 : 1);
     const result = await otpService.sendSubscribeOtp(msisdn, effectiveSubServiceId, clientId);
     return apiResponse(res, 200, "OTP sent successfully", result);
   } catch (error) {

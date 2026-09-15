@@ -1,5 +1,6 @@
 const axios = require("axios");
 const telecomMapper = require("../telecom.mapper");
+const { attachTelecomLogger } = require("../../../utils/telecomLogger");
 
 /**
  * Zain Telecom Provider Implementation (South Sudan - SS)
@@ -23,10 +24,18 @@ class ZainProvider {
     this.operator = extra.operator || "ZAIN";
     this.reqType = extra.reqType || "1";
     this.language = extra.language || "_E";
+    this.subdomain = config.subdomain || "backreel";
+    this.clientId = config.client_id || 1;
 
     this.client = axios.create({
       baseURL: this.baseUrl,
       timeout: 8000,
+    });
+
+    attachTelecomLogger(this.client, {
+      provider: "ZAIN",
+      clientSubdomain: this.subdomain,
+      clientId: this.clientId,
     });
   }
 
@@ -37,6 +46,7 @@ class ZainProvider {
   async checkSub(msisdn) {
     try {
       const response = await this.client.get("/sub/checksub", {
+        metadata: { action: "checkSub", msisdn },
         params: {
           msisdn,
           serviceId: this.serviceId,
@@ -56,6 +66,7 @@ class ZainProvider {
   async subscribeOtp(msisdn, subServiceId) {
     try {
       const response = await this.client.get("/otp/subscribe", {
+        metadata: { action: "subscribeOtp", msisdn },
         params: {
           msisdn,
           subServiceId,
@@ -82,6 +93,7 @@ class ZainProvider {
   async validateOtp(msisdn, otp) {
     try {
       const response = await this.client.get("/otp/validate_otp", {
+        metadata: { action: "validateOtp", msisdn },
         params: { msisdn, otp },
       });
       return response.data;
@@ -98,6 +110,7 @@ class ZainProvider {
   async authOtpGenerate(msisdn) {
     try {
       const response = await this.client.get("/auth/otp/generate", {
+        metadata: { action: "authOtpGenerate", msisdn },
         params: {
           msisdn,
           language: this.language,
@@ -117,6 +130,7 @@ class ZainProvider {
   async authOtpValidate(msisdn, otp) {
     try {
       const response = await this.client.get("/auth/otp/validate", {
+        metadata: { action: "authOtpValidate", msisdn },
         params: { msisdn, otp },
       });
       return response.data;
@@ -133,6 +147,7 @@ class ZainProvider {
   async unsubscription(msisdn) {
     try {
       const response = await this.client.get("/sub/unsub", {
+        metadata: { action: "unsubscription", msisdn },
         params: {
           msisdn,
           serviceId: this.serviceId,

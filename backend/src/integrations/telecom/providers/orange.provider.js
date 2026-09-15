@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { attachTelecomLogger } = require("../../../utils/telecomLogger");
 
 /**
  * Orange Telecom Provider Implementation (Burkina Faso - OBF)
@@ -21,10 +22,18 @@ class OrangeProvider {
     this.country = extra.country || "BF";
     this.operator = extra.operator || "ORG";
     this.reqType = extra.reqType || "1";
+    this.subdomain = config.subdomain || "obf";
+    this.clientId = config.client_id || 2;
 
     this.client = axios.create({
       baseURL: this.baseUrl,
       timeout: 8000,
+    });
+
+    attachTelecomLogger(this.client, {
+      provider: "ORANGE_BF",
+      clientSubdomain: this.subdomain,
+      clientId: this.clientId,
     });
   }
 
@@ -36,6 +45,7 @@ class OrangeProvider {
   async checkSub(msisdn) {
     try {
       const response = await this.client.get("/Subs_Engine/checkSubscription", {
+        metadata: { action: "checkSub", msisdn },
         params: {
           msisdn,
           serviceId: this.serviceId,
@@ -75,6 +85,7 @@ class OrangeProvider {
   async syncSubscription(msisdn, subServiceId) {
     try {
       const response = await this.client.post("/Subs_Engine/subscription/sync", null, {
+        metadata: { action: "syncSubscription", msisdn },
         params: {
           msisdn,
           subServiceId,
@@ -109,6 +120,7 @@ class OrangeProvider {
   async subscribeOtp(msisdn, subServiceId) {
     try {
       const response = await this.client.post("/sms/sendOtp", null, {
+        metadata: { action: "subscribeOtp", msisdn },
         params: { msisdn },
       });
       const data = response.data || {};
@@ -136,6 +148,7 @@ class OrangeProvider {
   async validateOtp(msisdn, otp) {
     try {
       const response = await this.client.post("/sms/validateOtp", null, {
+        metadata: { action: "validateOtp", msisdn },
         params: { msisdn, otp },
       });
       const data = response.data || {};
@@ -161,6 +174,7 @@ class OrangeProvider {
   async authOtpGenerate(msisdn) {
     try {
       const response = await this.client.post("/sms/sendOtp", null, {
+        metadata: { action: "authOtpGenerate", msisdn },
         params: { msisdn },
       });
       const data = response.data || {};
@@ -188,6 +202,7 @@ class OrangeProvider {
   async authOtpValidate(msisdn, otp) {
     try {
       const response = await this.client.post("/sms/validateOtp", null, {
+        metadata: { action: "authOtpValidate", msisdn },
         params: { msisdn, otp },
       });
       const data = response.data || {};
@@ -213,6 +228,7 @@ class OrangeProvider {
   async unsubscription(msisdn) {
     try {
       const response = await this.client.get("/Subs_Engine/unSubscription/sync", {
+        metadata: { action: "unsubscription", msisdn },
         params: {
           msisdn,
           serviceId: this.serviceId,
