@@ -23,7 +23,7 @@ async function sendSubscribeOtp(msisdn, subServiceId, clientId = 1) {
     const res = await provider.subscribeOtp(msisdn, subServiceId);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
-      throw new Error("Failed to send OTP");
+      throw new Error(res.message || "Failed to send OTP");
     }
 
     const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 min expiration
@@ -58,7 +58,7 @@ async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
     const res = await provider.validateOtp(msisdn, otp);
 
     if (!telecomMapper.issuccess(res.responseCode)) {
-      throw new Error("OTP verification failed");
+      throw new Error(res.message || "OTP verification failed");
     }
 
     // 1. Mark OTP audit request as verified in DB
@@ -84,8 +84,8 @@ async function verifySubscribeOtp(msisdn, otp, clientId = 1) {
       await subscriptionRepository.upsertUserSubscription({
         userId,
         clientId,
-        currentStatus: "active",
-        subscriptionStatus: "active",
+        currentStatus: "pending",
+        subscriptionStatus: "pending",
         engineTransactionId: res.transactionId,
       });
     } catch (e) {

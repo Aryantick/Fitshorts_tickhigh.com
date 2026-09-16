@@ -81,6 +81,23 @@ async function checkMsisdnStatus(msisdn, clientId = 1) {
       };
     }
 
+    // If not active, sync current status to DB if user already exists
+    if (currentStatus !== "active") {
+      try {
+        const user = await usersRepository.findByMsisdn(msisdn);
+        if (user) {
+          await subscriptionRepository.updateSubscriptionStatus(
+            user.id,
+            clientId,
+            currentStatus,
+            subscriptionStatus || "inactive"
+          );
+        }
+      } catch (statusErr) {
+        console.warn("updateSubscriptionStatus warning in checkMsisdnStatus:", statusErr.message);
+      }
+    }
+
     const nextStep = telecomMapper.resolveNextStep(currentStatus);
 
     return {
