@@ -84,6 +84,29 @@ function parseArgs() {
     options.toTime = to.trim();
   }
 
+  const aliases = {
+    ooredoo_palestine: "opal",
+    ooredoo: "opal",
+    universe: "opal",
+    palestine: "opal",
+    jordan_orange: "orjo",
+    zordan_orange: "orjo",
+    jordan: "orjo",
+    orange_jo: "orjo",
+    orange_jordan: "orjo",
+    beecell: "orjo",
+    dialog: "dialogsl",
+    dsl: "dialogsl",
+    dialog_sl: "dialogsl",
+    zain: "backreel",
+    orange: "obf",
+    orange_bf: "obf",
+  };
+
+  if (options.client && aliases[options.client]) {
+    options.client = aliases[options.client];
+  }
+
   return options;
 }
 
@@ -255,9 +278,14 @@ async function main() {
   console.log(`${C.gray}   File   : ${C.dim}${targetPath}${C.reset}\n`);
 
   if (!fs.existsSync(targetPath)) {
-    console.log(`${C.yellow}No logs found for ${options.date} under client '${options.client}'.${C.reset}`);
-    console.log(`${C.gray}Make an API request to generate logs, or check available dates using 'ls backend/logs/telecom/${options.client}'${C.reset}`);
-    return;
+    if (options.tail) {
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.writeFileSync(targetPath, "");
+    } else {
+      console.log(`${C.yellow}No logs found for ${options.date} under client '${options.client}'.${C.reset}`);
+      console.log(`${C.gray}Make an API request to generate logs, or check available dates using 'ls backend/logs/telecom/${options.client}'${C.reset}`);
+      return;
+    }
   }
 
   // Handle live tailing

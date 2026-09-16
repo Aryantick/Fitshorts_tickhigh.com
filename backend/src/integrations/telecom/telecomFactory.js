@@ -2,6 +2,7 @@ const ZainProvider = require("./providers/zain.provider");
 const OrangeProvider = require("./providers/orange.provider");
 const DialogSLProvider = require("./providers/dialogsl.provider");
 const OoredooPalestineProvider = require("./providers/ooredoo_palestine.provider");
+const JordanOrangeProvider = require("./providers/jordan_orange.provider");
 
 function getTelecomProvider(config) {
   if (!config || !config.provider_key) {
@@ -25,6 +26,13 @@ function getTelecomProvider(config) {
     case "PALESTINE":
     case "OPAL":
       return new OoredooPalestineProvider(config);
+    case "JORDAN_ORANGE":
+    case "ZORDAN_ORANGE":
+    case "ORANGE_JO":
+    case "ORJO":
+    case "BEECELL_ORANGE":
+    case "BEECELL":
+      return new JordanOrangeProvider(config);
     default:
       throw new Error(`Unsupported telecom provider key: ${config.provider_key}`);
   }
