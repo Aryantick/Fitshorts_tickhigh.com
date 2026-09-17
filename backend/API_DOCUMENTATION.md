@@ -21,6 +21,10 @@ To target a specific tenant when testing locally or from a frontend application,
 |---|---|---|---|
 | **Wellness360 Default** | `backreel` | Zain (SS) | `https://wbilzss.tickhighs.com` |
 | **Orange Burkina Faso** | `obf` | Orange (BF) | `https://obfpartner.telecomnetsolution.com` |
+| **Dialog Sri Lanka** | `dialogsl` | Dialog (SL) | `https://ideabiz.lk` |
+| **Ooredoo Palestine** | `opal` | Ooredoo (PS) | `https://bilunipal.tickhighs.com` |
+| **Orange Jordan** | `orjo` | Orange (JO) | `https://bilunipal.tickhighs.com` |
+| **Zain Jordan** | `zajo` | Zain (JO) | `https://bilunipal.tickhighs.com` |
 
 ---
 

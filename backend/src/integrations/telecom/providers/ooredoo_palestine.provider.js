@@ -66,7 +66,7 @@ class OOREDOO_PALESTINE {
                 subscriptionStatus = "ACTIVE";
             } else if (itemStatus === "PARKED_NO_BALANCE") {
                 currentStatus = "parking";
-                subscriptionStatus = "PARKED_NO_BALANCE";
+                subscriptionStatus = "";
             } else {
                 currentStatus = "unsub";
                 subscriptionStatus = itemStatus || "INACTIVE";
