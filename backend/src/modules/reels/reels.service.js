@@ -59,8 +59,8 @@ async function createReel(userId, title, description, rawS3Key, category, musicI
       status: "pending_review",
     };
   } catch (error) {
-    console.error("createReel error:", error.message);
-    throw new Error("Failed to create reel");
+    console.error("createReel error:", error);
+    throw new Error(error.message || "Failed to create reel");
   }
 }
 
