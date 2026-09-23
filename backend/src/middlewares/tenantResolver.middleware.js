@@ -1,5 +1,10 @@
 const clientService = require("../modules/client/client.service");
 
+// Known subdomain aliases mapping alternate or vanity subdomains to their primary tenant subdomain
+const SUBDOMAIN_ALIASES = {
+  activeorjo: "orjo",
+};
+
 /**
  * Extracts subdomain string from incoming request
  * Checks x-client-subdomain header first, then falls back to hostname
@@ -8,7 +13,8 @@ function extractSubdomain(req) {
   // 1. Priority: x-client-subdomain header (for local dev and frontend API requests)
   const headerSubdomain = req.headers["x-client-subdomain"];
   if (headerSubdomain && typeof headerSubdomain === "string") {
-    return headerSubdomain.trim().toLowerCase();
+    const cleanHeader = headerSubdomain.trim().toLowerCase();
+    return SUBDOMAIN_ALIASES[cleanHeader] || cleanHeader;
   }
 
   // 2. Subdomain from host header / domain name (e.g. obf.wellnesss360.com -> obf)
@@ -30,7 +36,8 @@ function extractSubdomain(req) {
   const reserved = ["admin", "www", "api"];
   if (reserved.includes(subdomain.toLowerCase())) return null;
 
-  return subdomain.toLowerCase();
+  const cleanSubdomain = subdomain.toLowerCase();
+  return SUBDOMAIN_ALIASES[cleanSubdomain] || cleanSubdomain;
 }
 
 /**
