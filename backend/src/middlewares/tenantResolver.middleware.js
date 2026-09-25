@@ -3,6 +3,7 @@ const clientService = require("../modules/client/client.service");
 // Known subdomain aliases mapping alternate or vanity subdomains to their primary tenant subdomain
 const SUBDOMAIN_ALIASES = {
   activeorjo: "orjo",
+  zajoac: "zajo",
 };
 
 /**
