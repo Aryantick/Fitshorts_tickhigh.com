@@ -4,6 +4,7 @@ const clientService = require("../modules/client/client.service");
 const SUBDOMAIN_ALIASES = {
   activeorjo: "orjo",
   zajoac: "zajo",
+  reelback: "backreel",
 };
 
 /**
