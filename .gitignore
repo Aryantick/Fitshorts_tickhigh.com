@@ -31,3 +31,4 @@ Thumbs.db
 *.swp
 *.swo
 backend/.env.prod
+/frontendadmin
