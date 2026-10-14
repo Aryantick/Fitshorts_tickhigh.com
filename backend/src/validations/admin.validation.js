@@ -5,14 +5,18 @@ const adminRoleValues = Object.values(ADMIN_ROLES);
 const reelStatusValues = Object.values(REEL_STATUS);
 
 const adminLoginSchema = {
-  body: z.object({
-    identifier: z
-      .string({ required_error: "identifier is required" })
-      .min(3, "identifier must be at least 3 characters"),
-    password: z
-      .string({ required_error: "password is required" })
-      .min(6, "password must be at least 6 characters"),
-  }),
+  body: z
+    .object({
+      email: z.string().email("Invalid email address").optional(),
+      identifier: z.string().min(3).optional(),
+      password: z
+        .string({ required_error: "password is required" })
+        .min(6, "password must be at least 6 characters"),
+    })
+    .refine((data) => Boolean(data.email || data.identifier), {
+      message: "Email or identifier is required",
+      path: ["email"],
+    }),
 };
 
 const adminRegisterSchema = {

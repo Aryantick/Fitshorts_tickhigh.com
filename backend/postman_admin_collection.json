@@ -1,0 +1,881 @@
+{
+  "info": {
+    "_postman_id": "wellness360-admin-portal-v1",
+    "name": "Wellness360 - Admin Portal API Collection (Phase 1 MVP)",
+    "description": "Comprehensive Postman collection for Wellness360 Admin Portal, including Multi-Tenant Client Scopes, Reel Moderation Queue, Dynamic Roles & Permissions, User Management, Categories, Leaderboard, Audit Logs, and Bulk Music Upload.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Admin Auth & Profile",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('adminToken', jsonData.data.token);",
+                  "    console.log('adminToken saved automatically:', jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"superadmin@tickhigh.com\",\n  \"password\": \"ChangeThisPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "login"]
+            },
+            "description": "Logs in an admin with Email/Username and Password, saves JWT token automatically to collection variables."
+          }
+        },
+        {
+          "name": "Get Current Admin Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "me"]
+            },
+            "description": "Returns current logged in admin session profile, assigned client scope, and dynamic permissions."
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"ChangeThisPassword123!\",\n  \"newPassword\": \"NewSecurePass2026!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "change-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Dynamic Roles & Permissions (UI Configurable)",
+      "item": [
+        {
+          "name": "Get All Roles (System & Custom)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles"]
+            },
+            "description": "Fetches all roles (Super Admin, Content Admin, Moderator, Analytics Admin, Viewer, and custom roles) with their JSON permissions."
+          }
+        },
+        {
+          "name": "Get Role By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create Custom Role (UI Checkboxes)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Orange Senior Reviewer\",\n  \"description\": \"Custom role profile created from Admin UI for Orange BF team\",\n  \"client_id\": 2,\n  \"permissions\": {\n    \"pages\": [\n      \"dashboard\",\n      \"moderation\",\n      \"reels\"\n    ],\n    \"actions\": {\n      \"canApproveReel\": true,\n      \"canRejectReel\": true,\n      \"canSuspendReel\": false,\n      \"canBlockUser\": false,\n      \"isReadOnly\": false\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles"]
+            }
+          }
+        },
+        {
+          "name": "Update Role Permissions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Orange Senior Reviewer Updated\",\n  \"description\": \"Updated role permissions from UI\",\n  \"permissions\": {\n    \"pages\": [\n      \"dashboard\",\n      \"moderation\",\n      \"reels\",\n      \"categories\"\n    ],\n    \"actions\": {\n      \"canApproveReel\": true,\n      \"canRejectReel\": true,\n      \"canSuspendReel\": true,\n      \"canBlockUser\": false,\n      \"isReadOnly\": false\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles", "6"]
+            }
+          }
+        },
+        {
+          "name": "Delete Custom Role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles", "6"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Admin Team Management",
+      "item": [
+        {
+          "name": "Get All Admin Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/admin-users?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "admin-users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Admin User (Email + Password + Role + Client)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"hamid_orange\",\n  \"email\": \"hamid@orange.bf\",\n  \"password\": \"Password123!\",\n  \"display_name\": \"Hamid Orange Lead\",\n  \"role_id\": 3,\n  \"client_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/admin-users",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "admin-users"]
+            }
+          }
+        },
+        {
+          "name": "Update Admin Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/admin-users/2/role",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "admin-users", "2", "role"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Admin User Active / Deactivate",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/admin-users/2/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "admin-users", "2", "toggle"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Dashboard & Clients",
+      "item": [
+        {
+          "name": "Get Dashboard Overview Stats (Global)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "dashboard", "stats"]
+            },
+            "description": "Returns total users, active users, reels (pending, approved, rejected, suspended), views, likes, shares, saves, top categories, top creators, and 14-day daily upload trends."
+          }
+        },
+        {
+          "name": "Get Dashboard Overview Stats (Client Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/stats?client_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "dashboard", "stats"],
+              "query": [
+                {
+                  "key": "client_id",
+                  "value": "1",
+                  "description": "1 = Wellness360 / Zain SS, 2 = Orange BF, 3 = Dialog SL, 4 = Ooredoo PS, 5 = Orange JO, 6 = Zain JO"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Clients (Telecom Operators)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "clients"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Reel Management & Moderation Queue",
+      "item": [
+        {
+          "name": "Get Rejection Reasons (11 Standard Reasons)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/rejection-reasons",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "rejection-reasons"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Reels Queue (FIFO - Oldest First)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels?status=pending_review&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels"],
+              "query": [
+                { "key": "status", "value": "pending_review" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Live Reels (Approved & Published)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels?status=published&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels"],
+              "query": [
+                { "key": "status", "value": "published" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Reels with Filters & Search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels?status=all&client_id=1&search=workout&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels"],
+              "query": [
+                { "key": "status", "value": "all" },
+                { "key": "client_id", "value": "1" },
+                { "key": "search", "value": "workout" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Reel Details & S3 Preview URLs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "1"]
+            },
+            "description": "Returns full reel details with AWS S3 pre-signed playback URL, thumbnail URL, attached background music URL, and creator metadata."
+          }
+        },
+        {
+          "name": "Approve Reel (Publish Live)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/1/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "1", "approve"]
+            },
+            "description": "Sets status to 'published', records review metadata, sends push/in-app notification to the creator, and logs to audit trail."
+          }
+        },
+        {
+          "name": "Reject Reel (With Reason)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Misleading health information\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/1/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "1", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Suspend Reel (Take Down Live Reel)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Copyright issue reported by rights holder\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/1/suspend",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "1", "suspend"]
+            }
+          }
+        },
+        {
+          "name": "Delete Reel (Permanent Removal)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Violated community guidelines\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reels/1/delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reels", "1", "delete"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. User Management",
+      "item": [
+        {
+          "name": "Get Users List (with Reels Stats & Client Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?page=1&limit=10&client_id=1&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "client_id", "value": "1" },
+                { "key": "search", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Profile Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get User Uploaded Reels History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/1/reels?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "1", "reels"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Block / Suspend User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isBlocked\": true,\n  \"reason\": \"Repeated posting of unsafe exercise content\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "1", "status"]
+            }
+          }
+        },
+        {
+          "name": "Unblock / Reactivate User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isBlocked\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "1", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Categories Management",
+      "item": [
+        {
+          "name": "Get All Categories (with Reel Count)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Create New Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pilates & Core\",\n  \"slug\": \"pilates-core\",\n  \"description\": \"Low impact core-strengthening workouts\",\n  \"displayOrder\": 9\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pilates & Core Training\",\n  \"description\": \"Core strengthening, posture correction and flexibility\",\n  \"displayOrder\": 9,\n  \"is_active\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories/9",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "categories", "9"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Category Active / Inactive",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories/9/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "categories", "9", "toggle"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Leaderboard",
+      "item": [
+        {
+          "name": "Get Leaderboard (All-Time)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/leaderboard?period=all_time&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "leaderboard"],
+              "query": [
+                { "key": "period", "value": "all_time" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Leaderboard (Weekly + Client Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/leaderboard?period=weekly&client_id=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "leaderboard"],
+              "query": [
+                { "key": "period", "value": "weekly" },
+                { "key": "client_id", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Bulk Music Upload (Super Admin)",
+      "item": [
+        {
+          "name": "Bulk Upload Music Tracks (With Categories)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tracks\": [\n    {\n      \"title\": \"Morning Yoga Flow Beats\",\n      \"artist\": \"Zen Sound Lab\",\n      \"s3Key\": \"music/yoga-flow-morning.mp3\",\n      \"durationSec\": 60,\n      \"category\": \"Yoga\"\n    },\n    {\n      \"title\": \"Cardio Pump High Energy\",\n      \"artist\": \"FitBeats Studio\",\n      \"s3Key\": \"music/cardio-pump-hiit.mp3\",\n      \"durationSec\": 45,\n      \"category\": \"Workout\"\n    },\n    {\n      \"title\": \"Deep Breath Meditation Flute\",\n      \"artist\": \"Prana Waves\",\n      \"s3Key\": \"music/deep-meditation-flute.mp3\",\n      \"durationSec\": 60,\n      \"category\": \"Meditation\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/music/bulk-upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "music", "bulk-upload"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Admin Audit Logs",
+      "item": [
+        {
+          "name": "Get Activity Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-logs?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit-logs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
