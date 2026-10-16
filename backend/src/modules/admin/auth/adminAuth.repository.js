@@ -25,6 +25,7 @@ async function findAdminById(id) {
       a.id,
       a.username,
       a.email,
+      a.password_hash,
       a.role,
       a.role_id,
       a.client_id,
@@ -153,6 +154,13 @@ async function updateAdminPassword(adminId, passwordHash) {
   );
   return result;
 }
+async function deleteAdminUser(adminId) {
+  const [result] = await pool.query(
+    "DELETE FROM admins WHERE id = ?",
+    [adminId]
+  );
+  return result;
+}
 
 module.exports = {
   findAdminByEmailOrUsername,
@@ -162,4 +170,5 @@ module.exports = {
   updateAdminUserRole,
   toggleAdminUserActive,
   updateAdminPassword,
+  deleteAdminUser,
 };

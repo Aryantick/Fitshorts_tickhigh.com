@@ -27,6 +27,9 @@ async function findReels({
       conditions.push("r.status = ?");
       params.push(status);
     }
+  } else {
+    // Exclude soft-deleted reels from general list
+    conditions.push("r.status != 'deleted'");
   }
 
   if (clientId && clientId !== "all") {

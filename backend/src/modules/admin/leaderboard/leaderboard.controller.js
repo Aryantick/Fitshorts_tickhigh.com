@@ -7,7 +7,7 @@ async function getLeaderboard(req, res) {
     const result = await LeaderboardService.getLeaderboard({
       period: period || "all_time",
       clientId: client_id,
-      limit: limit || 20,
+      limit: limit ? Math.min(5, Number(limit)) : 5,
     });
     return apiResponse(res, 200, "Leaderboard fetched successfully", result);
   } catch (error) {

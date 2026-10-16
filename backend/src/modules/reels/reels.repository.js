@@ -1,10 +1,10 @@
 const pool = require("../../config/db.config");
 const { REEL_STATUS } = require("../../constants/enums");
 
-async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
+async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1, categoryId = null) {
   const [result] = await pool.query(
-    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, music_id, client_id, status, view_count, like_count) VALUES (?,?,?,?,?,?,?,?, 0, 0)",
-    [userId, title, description, rawS3Key, category, musicId || null, clientId, REEL_STATUS.PENDING_REVIEW]
+    "INSERT INTO reels (user_id, title, description, raw_s3_key, category, category_id, music_id, client_id, status, view_count, like_count) VALUES (?,?,?,?,?,?,?,?,?, 0, 0)",
+    [userId, title, description, rawS3Key, category, categoryId || null, musicId || null, clientId, REEL_STATUS.PENDING_REVIEW]
   );
   console.log("RAW queryResult:", result);
   return result;
@@ -96,6 +96,10 @@ async function updateReelMetadata(id, clientId, updates) {
   if (updates.category !== undefined) {
     fields.push("category = ?");
     values.push(updates.category);
+  }
+  if (updates.categoryId !== undefined || updates.category_id !== undefined) {
+    fields.push("category_id = ?");
+    values.push(updates.categoryId ?? updates.category_id);
   }
 
   if (fields.length === 0) {

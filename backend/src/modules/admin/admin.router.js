@@ -19,6 +19,7 @@ const CategoriesController = require("./categories/categories.controller");
 const LeaderboardController = require("./leaderboard/leaderboard.controller");
 const AuditController = require("./audit/audit.controller");
 const AdminMusicController = require("./music/adminMusic.controller");
+const AdminMenusController = require("./menus/adminMenus.controller");
 
 // ==========================================
 // 1. ADMIN AUTH & SESSION (EMAIL + PASSWORD LOGIN)
@@ -45,6 +46,7 @@ router.get("/admin/admin-users", authenticateAdmin, enforceTenantScope, AdminAut
 router.post("/admin/admin-users", authenticateAdmin, enforceTenantScope, requireAction("canManageAdmins"), AdminAuthController.createAdminUser);
 router.patch("/admin/admin-users/:id/role", authenticateAdmin, enforceTenantScope, requireAction("canManageAdmins"), AdminAuthController.updateAdminRole);
 router.patch("/admin/admin-users/:id/toggle", authenticateAdmin, enforceTenantScope, requireAction("canManageAdmins"), AdminAuthController.toggleAdminActive);
+router.delete("/admin/admin-users/:id", authenticateAdmin, enforceTenantScope, requireAction("canManageAdmins"), AdminAuthController.deleteAdminUser);
 
 // Backwards-compatible moderator creation route
 router.post(
@@ -111,5 +113,14 @@ router.post(
   requireAction("canBulkUploadMusic"),
   AdminMusicController.bulkUploadMusic
 );
+
+
+// ==========================================
+// DYNAMIC NAVIGATION MENUS CRUD (DATABASE DRIVEN - SUPER ADMIN ONLY)
+// ==========================================
+router.get("/admin/menus", authenticateAdmin, AdminMenusController.getMenus);
+router.post("/admin/menus", authenticateAdmin, requireSuperAdmin, AdminMenusController.createMenu);
+router.put("/admin/menus/:id", authenticateAdmin, requireSuperAdmin, AdminMenusController.updateMenu);
+router.delete("/admin/menus/:id", authenticateAdmin, requireSuperAdmin, AdminMenusController.deleteMenu);
 
 module.exports = router;

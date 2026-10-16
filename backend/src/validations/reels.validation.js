@@ -1,7 +1,4 @@
 const { z } = require("zod");
-const { REEL_CATEGORIES } = require("../constants/enums");
-
-const categoryValues = Object.values(REEL_CATEGORIES);
 
 const uploadReelSchema = {
   body: z.object({
@@ -14,12 +11,13 @@ const uploadReelSchema = {
       .max(500, "description must not exceed 500 characters")
       .optional(),
     rawS3Key: z.string({ required_error: "rawS3Key is required" }),
-    category: z.enum(categoryValues, {
-      errorMap: () => ({
-        message: `category must be one of: ${categoryValues.join(", ")}`,
-      }),
-    }),
+    category: z.string().min(1, "category must not be empty").max(100).optional(),
+    categoryId: z.union([z.number(), z.string()]).optional().nullable(),
+    category_id: z.union([z.number(), z.string()]).optional().nullable(),
     musicId: z.number().or(z.string()).optional().nullable(),
+  }).refine((data) => data.category || data.categoryId || data.category_id, {
+    message: "Either category name/slug or categoryId is required",
+    path: ["category"],
   }),
 };
 
@@ -30,7 +28,9 @@ const updateReelMetadataSchema = {
   body: z.object({
     title: z.string().min(2).max(150).optional(),
     description: z.string().max(500).optional(),
-    category: z.enum(categoryValues).optional(),
+    category: z.string().min(1).max(100).optional(),
+    categoryId: z.union([z.number(), z.string()]).optional().nullable(),
+    category_id: z.union([z.number(), z.string()]).optional().nullable(),
   }),
 };
 

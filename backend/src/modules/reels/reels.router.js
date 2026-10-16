@@ -1,3 +1,4 @@
+const CategoriesController = require("../admin/categories/categories.controller");
 const router = require("express").Router();
 const reelsController = require("./reels.controller");
 const authenticateUser = require("../../middlewares/auth.middlewares");
@@ -8,6 +9,8 @@ const {
   reelIdParamSchema,
 } = require("../../validations/reels.validation");
 
+router.get("/categories", CategoriesController.getCategories);
+router.get("/reels/categories", CategoriesController.getCategories);
 router.get("/reels/upload-url", authenticateUser, reelsController.getUploadUrl);
 router.post("/reels/upload", authenticateUser, validate(uploadReelSchema), reelsController.uploadReel);
 router.post("/reels", authenticateUser, validate(uploadReelSchema), reelsController.uploadReel);

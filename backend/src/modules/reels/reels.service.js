@@ -1,3 +1,4 @@
+const pool = require("../../config/db.config");
 const S3Client = require("../../integrations/s3/s3.client");
 const ReelsRepository = require("./reels.repository");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -16,16 +17,35 @@ async function getUploadUrl(userId, fileExtension, clientId = 1) {
   }
 }
 
-async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1) {
+async function createReel(userId, title, description, rawS3Key, category, musicId, clientId = 1, categoryId = null) {
   try {
+    let resolvedCategoryId = categoryId ? Number(categoryId) : null;
+    let resolvedCategory = category || null;
+
+    if (resolvedCategoryId || resolvedCategory) {
+      try {
+        const [catRows] = await pool.query(
+          "SELECT id, slug, name FROM categories WHERE id = ? OR slug = ? OR name = ? LIMIT 1",
+          [resolvedCategoryId || 0, resolvedCategory || "", resolvedCategory || ""]
+        );
+        if (catRows && catRows.length > 0) {
+          resolvedCategoryId = catRows[0].id;
+          resolvedCategory = catRows[0].slug || catRows[0].name;
+        }
+      } catch (catErr) {
+        console.warn("Could not auto-resolve category from db:", catErr.message);
+      }
+    }
+
     const result = await ReelsRepository.createReel(
       userId,
       title,
       description,
       rawS3Key,
-      category,
+      resolvedCategory,
       musicId,
-      clientId
+      clientId,
+      resolvedCategoryId
     );
 
     if (musicId) {

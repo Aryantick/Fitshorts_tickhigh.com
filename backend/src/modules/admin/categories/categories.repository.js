@@ -5,26 +5,10 @@ const pool = require("../../../config/db.config");
  * Fetches categories master list, then maps counts via grouped category_id index.
  */
 async function findAllCategories() {
-  const [categories] = await pool.query(`
-    SELECT * FROM categories ORDER BY display_order ASC, name ASC
-  `);
-
-  if (categories.length === 0) return [];
-
-  const [countRows] = await pool.query(`
-    SELECT category_id, COUNT(*) AS count
-    FROM reels
-    WHERE category_id IS NOT NULL
-    GROUP BY category_id
-  `);
-
-  const countMap = new Map();
-  countRows.forEach((r) => countMap.set(r.category_id, Number(r.count)));
-
-  return categories.map((c) => ({
-    ...c,
-    reel_count: countMap.get(c.id) || 0,
-  }));
+  const [categories] = await pool.query(
+    "SELECT * FROM categories ORDER BY display_order ASC, name ASC"
+  );
+  return categories;
 }
 
 async function createCategory({ name, slug, description, iconUrl, displayOrder = 0 }) {

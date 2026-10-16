@@ -1,13 +1,7 @@
 const DashboardRepository = require("./dashboard.repository");
 
-async function getDashboardStats(clientId = null) {
-  const stats = await DashboardRepository.getDashboardStats(clientId);
-  const clients = await DashboardRepository.findAllClients();
-
-  return {
-    ...stats,
-    available_clients: clients,
-  };
+async function getDashboardStats({ clientId = null, startDate = null, endDate = null } = {}) {
+  return await DashboardRepository.getDashboardStats({ clientId, startDate, endDate });
 }
 
 async function getClientsList() {

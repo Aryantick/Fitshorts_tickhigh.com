@@ -3,8 +3,12 @@ const apiResponse = require("../../../utils/apiResponse");
 
 async function getDashboardStats(req, res) {
   try {
-    const { client_id } = req.query;
-    const stats = await DashboardService.getDashboardStats(client_id);
+    const { client_id, startDate, endDate, start_date, end_date } = req.query;
+    const stats = await DashboardService.getDashboardStats({
+      clientId: client_id,
+      startDate: startDate || start_date || null,
+      endDate: endDate || end_date || null,
+    });
     return apiResponse(res, 200, "Dashboard stats fetched successfully", stats);
   } catch (error) {
     return apiResponse(res, 400, error.message, null);

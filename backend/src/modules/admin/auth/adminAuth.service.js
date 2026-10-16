@@ -5,6 +5,7 @@ const AdminRolesRepository = require("../roles/adminRoles.repository");
 const AuditRepository = require("../audit/audit.repository");
 const JwtConfig = require("../../../config/jwt.config");
 const { AUDIT_ACTIONS } = require("../../../constants/enums");
+const { buildAdminMenus } = require("./menuBuilder");
 
 // Helper to parse role permissions safely
 function parsePermissions(perm) {
@@ -86,7 +87,10 @@ async function loginAdmin({ email, identifier, password, ipAddress = null }) {
     console.warn("Audit log error:", auditErr.message);
   }
 
+  const menus = await buildAdminMenus(admin.role_slug || admin.role, permissions);
+
   const adminObj = {
+    menus,
     id: admin.id,
     name: admin.display_name || admin.username,
     username: admin.username,
@@ -103,9 +107,7 @@ async function loginAdmin({ email, identifier, password, ipAddress = null }) {
   return {
     accessToken,
     refreshToken,
-    token: accessToken,
     admin: adminObj,
-    user: adminObj,
   };
 }
 
@@ -131,6 +133,7 @@ async function getAdminProfile(adminId) {
     isActive: admin.is_active,
     createdAt: admin.created_at,
     permissions,
+    menus: await buildAdminMenus(admin.role_slug || admin.role, permissions),
   };
 }
 
@@ -334,27 +337,40 @@ async function refreshAdminToken(refreshToken) {
     { expiresIn: JwtConfig.adminRefreshExpiry }
   );
 
-  const adminObj = {
-    id: admin.id,
-    name: admin.display_name || admin.username,
-    username: admin.username,
-    email: admin.email,
-    displayName: admin.display_name || admin.username,
-    role: admin.role_slug || admin.role,
-    roleName: admin.role_name || admin.role,
-    roleId: admin.role_id,
-    clientId: admin.client_id || null,
-    clientName: admin.client_name || "Global (All Clients)",
-    permissions,
-  };
-
   return {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
-    token: newAccessToken,
-    admin: adminObj,
-    user: adminObj,
   };
+}
+
+async function deleteAdminUser(adminId, creatorAdminId, creatorUsername, ipAddress) {
+  if (Number(adminId) === Number(creatorAdminId)) {
+    throw new Error("You cannot delete your own admin account");
+  }
+
+  const target = await AdminAuthRepository.findAdminById(adminId);
+  if (!target) {
+    throw new Error("Admin user not found");
+  }
+
+  if (target.role === "super_admin" || target.role_slug === "super_admin") {
+    throw new Error("Super Admin accounts are permanently protected and cannot be deleted");
+  }
+
+  await AdminAuthRepository.deleteAdminUser(adminId);
+
+  try {
+    await AuditRepository.createAuditLog({
+      adminId: creatorAdminId,
+      adminUsername: creatorUsername,
+      action: "admin_user_deleted",
+      targetType: "admin",
+      targetId: adminId,
+      ipAddress,
+    });
+  } catch (err) {}
+
+  return { success: true, message: "Admin user permanently deleted" };
 }
 
 module.exports = {
@@ -366,5 +382,5 @@ module.exports = {
   createAdminUser,
   updateAdminUserRole,
   toggleAdminUserActive,
+  deleteAdminUser,
 };
-

@@ -4,8 +4,8 @@ const pool = require("../../../config/db.config");
  * High-Production Optimized Leaderboard
  * Computes rankings on reels table directly, then hydrates user and category metadata in O(limit).
  */
-async function getLeaderboard({ period = "all_time", clientId = null, limit = 20 }) {
-  const limitNum = Math.max(1, Math.min(100, Number(limit)));
+async function getLeaderboard({ period = "all_time", clientId = null, limit = 5 }) {
+  const limitNum = Math.max(1, Math.min(5, Number(limit || 5)));
   const clientFilter = clientId && clientId !== "all" ? Number(clientId) : null;
 
   let dateFilter = "";

@@ -1,67 +1,67 @@
+const pool = require("../config/db.config");
 const { redis, getTenantKey } = require("../utils/redis.util");
-const ReelsRepository = require("../modules/reels/reels.repository");
 
 /**
- * Periodically sync real-time views and likes from Redis to MySQL DB
+ * Periodically sync views and likes from child tables (reel_views, reel_likes)
+ * and Redis dirty sets directly to the master "reels" table.
+ * Runs every 2 minutes.
  */
-async function syncCountersToDB(tenantId = "default") {
-  console.log(`[Sync Worker] Starting Redis -> MySQL sync for tenant: ${tenantId}...`);
+async function syncCountersToDB() {
+  console.log("[Sync Worker] Starting Child Tables -> Master Reels sync...");
 
   try {
-    const dirtyViewsKey = getTenantKey(tenantId, "reel", "dirty_views");
-    const dirtyLikesKey = getTenantKey(tenantId, "reel", "dirty_likes");
+    // 1. Sync from permanent child tables (reel_views & reel_likes) to master table reels
+    const [result] = await pool.query(`
+      UPDATE reels r 
+      JOIN (
+        SELECT r.id, 
+               (SELECT COUNT(*) FROM reel_views v WHERE v.reel_id = r.id) AS v_cnt,
+               (SELECT COUNT(*) FROM reel_likes l WHERE l.reel_id = r.id) AS l_cnt
+        FROM reels r
+      ) agg ON r.id = agg.id
+      SET r.view_count = agg.v_cnt,
+          r.like_count = agg.l_cnt
+      WHERE r.view_count != agg.v_cnt OR r.like_count != agg.l_cnt;
+    `);
 
-    // Pop dirty reel IDs
-    const dirtyViewReelIds = await redis.smembers(dirtyViewsKey);
-    const dirtyLikeReelIds = await redis.smembers(dirtyLikesKey);
+    const changedCount = result.changedRows || 0;
+    console.log(`[Sync Worker] Child tables -> Master reels sync completed. Updated ${changedCount} reels.`);
 
-    const allReelIds = Array.from(new Set([...dirtyViewReelIds, ...dirtyLikeReelIds]));
-
-    if (allReelIds.length === 0) {
-      console.log("[Sync Worker] No dirty counters to sync.");
-      return;
+    // 2. Also clear any pending Redis dirty keys if Redis is available
+    if (redis && redis.status === "ready") {
+      try {
+        const dirtyKeys = await redis.keys("*:dirty_*");
+        if (dirtyKeys && dirtyKeys.length > 0) {
+          await redis.del(...dirtyKeys);
+        }
+      } catch (redisErr) {
+        // Non-fatal
+      }
     }
-
-    console.log(`[Sync Worker] Syncing ${allReelIds.length} reels to MySQL...`);
-
-    for (const reelId of allReelIds) {
-      const viewsKey = getTenantKey(tenantId, "reel", `${reelId}:views`);
-      const likesKey = getTenantKey(tenantId, "reel", `${reelId}:likes`);
-
-      const [views, likes] = await redis.mget(viewsKey, likesKey);
-      const viewsCount = views ? parseInt(views, 10) : 0;
-      const likesCount = likes ? parseInt(likes, 10) : 0;
-
-      await ReelsRepository.updateCounts(reelId, viewsCount, likesCount);
-    }
-
-    // Clear processed dirty sets
-    if (dirtyViewReelIds.length > 0) {
-      await redis.srem(dirtyViewsKey, ...dirtyViewReelIds);
-    }
-    if (dirtyLikeReelIds.length > 0) {
-      await redis.srem(dirtyLikesKey, ...dirtyLikeReelIds);
-    }
-
-    console.log("[Sync Worker] Redis -> MySQL sync completed successfully.");
   } catch (error) {
-    console.error("[Sync Worker] Error during counter sync:", error.message);
+    console.error("[Sync Worker] Error during child -> master sync:", error.message);
   }
 }
 
-// Run sync every 3 minutes if executed directly
-if (require.main === module) {
-  const SYNC_INTERVAL_MS = 3 * 60 * 1000;
-  console.log(`[Sync Worker] Started loop (Interval: ${SYNC_INTERVAL_MS / 1000}s)`);
-  
-  // Run immediately on startup
-  syncCountersToDB("default");
+// 2-Minute Sync Interval
+const SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
-  setInterval(() => {
-    syncCountersToDB("default");
-  }, SYNC_INTERVAL_MS);
+function startSyncWorker(intervalMs = SYNC_INTERVAL_MS) {
+  console.log(`[Sync Worker] Initialized 2-minute loop (Interval: ${intervalMs / 1000}s)`);
+  // Run on startup
+  syncCountersToDB();
+
+  // Run every 2 minutes
+  return setInterval(() => {
+    syncCountersToDB();
+  }, intervalMs);
+}
+
+if (require.main === module) {
+  startSyncWorker();
 }
 
 module.exports = {
   syncCountersToDB,
+  startSyncWorker,
 };

@@ -2,29 +2,42 @@ const pool = require("../../../config/db.config");
 
 /**
  * High-Production Optimized Dashboard Statistics
- * Avoids mega-table Cartesian joins by grouping indexed metrics independently.
+ * Supports dynamic Date Range filtering (startDate, endDate)
+ * and optional Multi-Tenant Client scoping (clientId).
  */
-async function getDashboardStats(clientId = null) {
+async function getDashboardStats({ clientId = null, startDate = null, endDate = null } = {}) {
   const clientFilter = clientId && clientId !== "all" ? Number(clientId) : null;
 
-  // 1. User stats (Single row aggregate)
+  // Date range normalization
+  let start = startDate ? new Date(startDate) : null;
+  let end = endDate ? new Date(endDate) : null;
+  if (start && isNaN(start.getTime())) start = null;
+  if (end && isNaN(end.getTime())) end = null;
+
+  const startStr = start ? start.toISOString().slice(0, 10) + " 00:00:00" : null;
+  const endStr = end ? end.toISOString().slice(0, 10) + " 23:59:59" : null;
+
+  // 1. User stats
   let userSql = `
     SELECT 
       COUNT(DISTINCT u.id) AS total_users,
       COUNT(DISTINCT CASE WHEN u.is_active = 1 AND (u.is_blocked = 0 OR u.is_blocked IS NULL) THEN u.id END) AS active_users,
-      COUNT(DISTINCT CASE WHEN u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN u.id END) AS new_users_30d,
+      COUNT(DISTINCT CASE WHEN ` + (startStr && endStr ? "u.created_at BETWEEN ? AND ?" : "u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)") + ` THEN u.id END) AS new_users_period,
       COUNT(DISTINCT CASE WHEN u.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN u.id END) AS new_users_7d
     FROM users u
   `;
   const userParams = [];
+  if (startStr && endStr) {
+    userParams.push(startStr, endStr);
+  }
 
   if (clientFilter) {
-    userSql += ` INNER JOIN user_client_relations ucr ON u.id = ucr.user_id WHERE ucr.client_id = ?`;
+    userSql += " INNER JOIN user_client_relations ucr ON u.id = ucr.user_id WHERE ucr.client_id = ?";
     userParams.push(clientFilter);
   }
   const [userStats] = await pool.query(userSql, userParams);
 
-  // 2. Reels stats (Single row aggregate on reels table)
+  // 2. Reels stats
   let reelSql = `
     SELECT 
       COUNT(*) AS total_reels,
@@ -33,15 +46,18 @@ async function getDashboardStats(clientId = null) {
       COUNT(CASE WHEN status = 'rejected' THEN 1 END) AS reels_rejected,
       COUNT(CASE WHEN status = 'suspended' THEN 1 END) AS reels_suspended,
       COALESCE(SUM(view_count), 0) AS total_views,
-      COALESCE(SUM(like_count), 0) AS total_likes,
-      COALESCE(SUM(share_count), 0) AS total_shares,
-      COALESCE(SUM(save_count), 0) AS total_saves
+      COALESCE(SUM(like_count), 0) AS total_likes
     FROM reels
+    WHERE 1=1
   `;
   const reelParams = [];
   if (clientFilter) {
-    reelSql += ` WHERE client_id = ?`;
+    reelSql += " AND client_id = ?";
     reelParams.push(clientFilter);
+  }
+  if (startStr && endStr) {
+    reelSql += " AND created_at BETWEEN ? AND ?";
+    reelParams.push(startStr, endStr);
   }
   const [reelStats] = await pool.query(reelSql, reelParams);
 
@@ -53,17 +69,21 @@ async function getDashboardStats(clientId = null) {
       COALESCE(SUM(r.view_count), 0) AS total_views
     FROM reels r
     LEFT JOIN categories c ON r.category_id = c.id
+    WHERE 1=1
   `;
   const catParams = [];
   if (clientFilter) {
-    catSql += ` WHERE r.client_id = ?`;
+    catSql += " AND r.client_id = ?";
     catParams.push(clientFilter);
   }
-  catSql += ` GROUP BY category_name ORDER BY count DESC LIMIT 8`;
+  if (startStr && endStr) {
+    catSql += " AND r.created_at BETWEEN ? AND ?";
+    catParams.push(startStr, endStr);
+  }
+  catSql += " GROUP BY category_name ORDER BY count DESC LIMIT 8";
   const [topCategories] = await pool.query(catSql, catParams);
 
-  // 4. Production Optimized Top Creators:
-  // Step 4a: Scan only reels table to find top 5 creator user_ids
+  // 4. Top Creators Leaderboard (Top 5)
   let topUserSql = `
     SELECT 
       user_id,
@@ -71,28 +91,34 @@ async function getDashboardStats(clientId = null) {
       COALESCE(SUM(view_count), 0) AS total_views,
       COALESCE(SUM(like_count), 0) AS total_likes
     FROM reels
+    WHERE 1=1
   `;
   const topUserParams = [];
   if (clientFilter) {
-    topUserSql += ` WHERE client_id = ?`;
+    topUserSql += " AND client_id = ?";
     topUserParams.push(clientFilter);
   }
-  topUserSql += ` GROUP BY user_id ORDER BY total_views DESC LIMIT 5`;
+  if (startStr && endStr) {
+    topUserSql += " AND created_at BETWEEN ? AND ?";
+    topUserParams.push(startStr, endStr);
+  }
+  topUserSql += " GROUP BY user_id ORDER BY total_views DESC LIMIT 5";
   const [creatorAggs] = await pool.query(topUserSql, topUserParams);
 
   let topCreators = [];
   if (creatorAggs.length > 0) {
     const creatorIds = creatorAggs.map((c) => c.user_id);
     const [userRows] = await pool.query(
-      `SELECT id, display_name, msisdn, avatar_key FROM users WHERE id IN (?)`,
+      "SELECT id, display_name, msisdn, avatar_key FROM users WHERE id IN (?)",
       [creatorIds]
     );
     const userMap = new Map();
     userRows.forEach((u) => userMap.set(u.id, u));
 
-    topCreators = creatorAggs.map((c) => {
+    topCreators = creatorAggs.map((c, idx) => {
       const u = userMap.get(c.user_id) || {};
       return {
+        rank: idx + 1,
         user_id: c.user_id,
         display_name: u.display_name || "Unknown Creator",
         msisdn: u.msisdn || "",
@@ -104,7 +130,7 @@ async function getDashboardStats(clientId = null) {
     });
   }
 
-  // 5. Daily uploads trend (Last 14 days)
+  // 5. Daily uploads trend
   let trendSql = `
     SELECT 
       DATE_FORMAT(created_at, '%Y-%m-%d') AS date,
@@ -112,17 +138,28 @@ async function getDashboardStats(clientId = null) {
       COUNT(CASE WHEN status IN ('approved', 'published') THEN 1 END) AS approved_count,
       COUNT(CASE WHEN status = 'rejected' THEN 1 END) AS rejected_count
     FROM reels
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+    WHERE 1=1
   `;
   const trendParams = [];
   if (clientFilter) {
-    trendSql += ` AND client_id = ?`;
+    trendSql += " AND client_id = ?";
     trendParams.push(clientFilter);
   }
-  trendSql += ` GROUP BY date ORDER BY date ASC`;
+  if (startStr && endStr) {
+    trendSql += " AND created_at BETWEEN ? AND ?";
+    trendParams.push(startStr, endStr);
+  } else {
+    trendSql += " AND created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)";
+  }
+  trendSql += " GROUP BY date ORDER BY date ASC";
   const [dailyUploadsTrend] = await pool.query(trendSql, trendParams);
 
   return {
+    date_range: {
+      startDate: startStr ? startStr.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      endDate: endStr ? endStr.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      isFiltered: Boolean(startStr && endStr),
+    },
     users: userStats[0] || {},
     reels: reelStats[0] || {},
     top_categories: topCategories,

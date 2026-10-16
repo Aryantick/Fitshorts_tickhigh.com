@@ -17,7 +17,7 @@ async function getUploadUrl(req, res) {
 }
 
 async function uploadReel(req, res) {
-  const { title, description, rawS3Key, category, musicId } = req.body;
+  const { title, description, rawS3Key, category, categoryId, category_id, musicId } = req.body;
   const userId = req.user.userId;
   const clientId = req.client ? req.client.id : 1;
 
@@ -32,7 +32,8 @@ async function uploadReel(req, res) {
       rawS3Key,
       category,
       musicId,
-      clientId
+      clientId,
+      categoryId || category_id || null
     );
 
     return apiResponse(res, 200, "Reel created successfully", result);

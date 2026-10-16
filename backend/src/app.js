@@ -73,7 +73,8 @@ if (require.main === module) {
     if (process.env.NODE_ENV !== "production") {
       try {
         require("./workers/reelTranscode.worker");
-        require("./workers/sync-counters.worker");
+        const syncWorker = require("./workers/sync-counters.worker");
+        if (syncWorker && typeof syncWorker.startSyncWorker === "function") syncWorker.startSyncWorker();
         console.log("[Local Dev] Background workers (Transcoder & Sync Counters) initialized.");
       } catch (err) {
         console.warn("[Local Dev] Warning initializing workers:", err.message);
