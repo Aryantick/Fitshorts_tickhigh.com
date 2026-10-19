@@ -114,12 +114,78 @@ async function getMusicById(musicId) {
   }
 }
 
+async function getBatchUploadUrls(adminId, fileList) {
+  try {
+    const results = await Promise.all(
+      fileList.map(async (item) => {
+        const rawExt = item.fileExtension || (item.fileName ? item.fileName.split(".").pop() : "mp3");
+        const cleanExt = String(rawExt).trim().toLowerCase().replace(/^\./, "") || "mp3";
+        const { uploadUrl, key } = await S3Client.generateAudioUrl(adminId, cleanExt);
+        return {
+          fileName: item.fileName || `audio.${cleanExt}`,
+          fileExtension: cleanExt,
+          uploadUrl,
+          key,
+        };
+      })
+    );
+    return results;
+  } catch (error) {
+    console.error("getBatchUploadUrls error:", error.message);
+    throw new Error("Failed to generate batch upload URLs");
+  }
+}
+
+async function deleteMusic(musicId, adminId = null, adminUsername = null, ipAddress = null) {
+  try {
+    const track = await MusicRepository.findMusicById(musicId);
+    if (!track) {
+      throw new Error("Music track not found");
+    }
+
+    if (track.s3_key) {
+      try {
+        await S3Client.deleteFile(track.s3_key);
+      } catch (s3Err) {
+        console.warn("Could not delete S3 audio file:", s3Err.message);
+      }
+    }
+
+    const deleted = await MusicRepository.deleteMusicById(musicId);
+
+    if (adminId) {
+      try {
+        const AuditRepository = require("../admin/audit/audit.repository");
+        const { AUDIT_ACTIONS } = require("../../constants/enums");
+        await AuditRepository.createAuditLog({
+          adminId,
+          adminUsername,
+          action: AUDIT_ACTIONS.MUSIC_DELETED || "music_deleted",
+          targetType: "music",
+          targetId: musicId,
+          details: { title: track.title, artist: track.artist, s3Key: track.s3_key },
+          ipAddress,
+        });
+      } catch (auditErr) {
+        // silent fail on audit log
+      }
+    }
+
+    return { deleted, id: musicId, title: track.title };
+  } catch (error) {
+    console.error("deleteMusic error:", error.message);
+    throw error;
+  }
+}
+
 module.exports = {
     getUploadUrlMusic,
+    getBatchUploadUrls,
     createMusic,
     musicCategories,
     getAllMusic,
     incrementUsageCount,
     getTrendingMusic,
     getMusicById,
-}
+    deleteMusic,
+};

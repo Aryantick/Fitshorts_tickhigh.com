@@ -110,7 +110,7 @@ router.get("/admin/audit-logs", authenticateAdmin, enforceTenantScope, AuditCont
 router.post(
   "/admin/music/bulk-upload",
   authenticateAdmin,
-  requireAction("canBulkUploadMusic"),
+  requireSuperAdmin,
   AdminMusicController.bulkUploadMusic
 );
 

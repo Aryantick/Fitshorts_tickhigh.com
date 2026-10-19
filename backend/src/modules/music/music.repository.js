@@ -2,8 +2,8 @@ const pool = require("../../config/db.config");
 
 async function CreateMusic(title, artist, s3Key, durationSec, adminId, category) {
   const [result] = await pool.query(
-    "INSERT INTO music_tracks (title, artist, s3_key, duration_sec, source_type, source_user_id, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [title, artist, s3Key, durationSec, "licensed", adminId, category],
+    "INSERT INTO music_tracks (title, artist, s3_key, duration_sec, source_type, source_user_id, category, status) VALUES (?, ?, ?, ?, 'licensed', NULL, ?, 'active')",
+    [title, artist, s3Key, durationSec || 0, category || "General"],
   );
   return result;
 }
@@ -47,6 +47,11 @@ async function findMusicById(id) {
   return rows[0] || null;
 }
 
+async function deleteMusicById(id) {
+  const [result] = await pool.query("DELETE FROM music_tracks WHERE id = ?", [id]);
+  return result.affectedRows > 0;
+}
+
 module.exports = {
   CreateMusic,
   findbyMusic,
@@ -54,4 +59,5 @@ module.exports = {
   incrementUsageCount,
   findTrandingMusic,
   findMusicById,
+  deleteMusicById,
 };

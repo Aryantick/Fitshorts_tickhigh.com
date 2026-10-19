@@ -7,20 +7,19 @@ async function createBulkMusicTracks(tracks) {
   const placeholders = [];
 
   for (const track of tracks) {
-    placeholders.push("(?, ?, ?, ?, ?, ?, 'active')");
+    placeholders.push("(?, ?, ?, ?, 'licensed', NULL, ?, 'active')");
     values.push(
-      track.title,
+      track.title || "Untitled Track",
       track.artist || "Unknown Artist",
       track.s3Key,
       track.durationSec || 0,
-      track.adminId || null,
       track.category || "General"
     );
   }
 
   const sql = `
     INSERT INTO music_tracks 
-    (title, artist, s3_key, duration_sec, source_user_id, category, status) 
+    (title, artist, s3_key, duration_sec, source_type, source_user_id, category, status) 
     VALUES ${placeholders.join(", ")}
   `;
 
@@ -31,3 +30,4 @@ async function createBulkMusicTracks(tracks) {
 module.exports = {
   createBulkMusicTracks,
 };
+

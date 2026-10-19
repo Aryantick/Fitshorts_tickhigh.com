@@ -1,6 +1,41 @@
 const pool = require("../../../config/db.config");
 
 /**
+ * Get current date string (YYYY-MM-DD) in Asia/Kolkata (IST) timezone
+ */
+function getTodayDateString() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+}
+
+/**
+ * Normalizes input date to YYYY-MM-DD format in Asia/Kolkata timezone
+ */
+function normalizeDateStr(dateInput) {
+  if (!dateInput) return null;
+  if (typeof dateInput === "string") {
+    const trimmed = dateInput.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return null;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(d);
+}
+
+/**
  * High-Production Optimized Dashboard Statistics
  * Supports dynamic Date Range filtering (startDate, endDate)
  * and optional Multi-Tenant Client scoping (clientId).
@@ -8,28 +43,35 @@ const pool = require("../../../config/db.config");
 async function getDashboardStats({ clientId = null, startDate = null, endDate = null } = {}) {
   const clientFilter = clientId && clientId !== "all" ? Number(clientId) : null;
 
-  // Date range normalization
-  let start = startDate ? new Date(startDate) : null;
-  let end = endDate ? new Date(endDate) : null;
-  if (start && isNaN(start.getTime())) start = null;
-  if (end && isNaN(end.getTime())) end = null;
+  // Track if user explicitly supplied date range filter from UI/query
+  const isFiltered = Boolean(
+    (startDate && String(startDate).trim().length > 0) ||
+    (endDate && String(endDate).trim().length > 0)
+  );
 
-  const startStr = start ? start.toISOString().slice(0, 10) + " 00:00:00" : null;
-  const endStr = end ? end.toISOString().slice(0, 10) + " 23:59:59" : null;
+  // Default to today (Asia/Kolkata) if dates are not provided
+  const today = getTodayDateString();
+  let resolvedStartDate = normalizeDateStr(startDate) || today;
+  let resolvedEndDate = normalizeDateStr(endDate) || today;
 
-  // 1. User stats
+  if (resolvedStartDate > resolvedEndDate) {
+    [resolvedStartDate, resolvedEndDate] = [resolvedEndDate, resolvedStartDate];
+  }
+
+  // Cover full day range: 00:00:00 to 23:59:59.999
+  const startStr = `${resolvedStartDate} 00:00:00`;
+  const endStr = `${resolvedEndDate} 23:59:59.999`;
+
+  // 1. User stats (total_users & active_users remain overall; new_users_period is filtered by date range)
   let userSql = `
     SELECT 
       COUNT(DISTINCT u.id) AS total_users,
       COUNT(DISTINCT CASE WHEN u.is_active = 1 AND (u.is_blocked = 0 OR u.is_blocked IS NULL) THEN u.id END) AS active_users,
-      COUNT(DISTINCT CASE WHEN ` + (startStr && endStr ? "u.created_at BETWEEN ? AND ?" : "u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)") + ` THEN u.id END) AS new_users_period,
+      COUNT(DISTINCT CASE WHEN u.created_at >= ? AND u.created_at <= ? THEN u.id END) AS new_users_period,
       COUNT(DISTINCT CASE WHEN u.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN u.id END) AS new_users_7d
     FROM users u
   `;
-  const userParams = [];
-  if (startStr && endStr) {
-    userParams.push(startStr, endStr);
-  }
+  const userParams = [startStr, endStr];
 
   if (clientFilter) {
     userSql += " INNER JOIN user_client_relations ucr ON u.id = ucr.user_id WHERE ucr.client_id = ?";
@@ -37,7 +79,7 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
   }
   const [userStats] = await pool.query(userSql, userParams);
 
-  // 2. Reels stats
+  // 2. Reels stats (scoped to resolved date range)
   let reelSql = `
     SELECT 
       COUNT(*) AS total_reels,
@@ -48,20 +90,16 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
       COALESCE(SUM(view_count), 0) AS total_views,
       COALESCE(SUM(like_count), 0) AS total_likes
     FROM reels
-    WHERE 1=1
+    WHERE created_at >= ? AND created_at <= ?
   `;
-  const reelParams = [];
+  const reelParams = [startStr, endStr];
   if (clientFilter) {
     reelSql += " AND client_id = ?";
     reelParams.push(clientFilter);
   }
-  if (startStr && endStr) {
-    reelSql += " AND created_at BETWEEN ? AND ?";
-    reelParams.push(startStr, endStr);
-  }
   const [reelStats] = await pool.query(reelSql, reelParams);
 
-  // 3. Top categories breakdown
+  // 3. Top categories breakdown (scoped to resolved date range)
   let catSql = `
     SELECT 
       COALESCE(c.name, r.category, 'Uncategorized') AS category_name,
@@ -69,21 +107,17 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
       COALESCE(SUM(r.view_count), 0) AS total_views
     FROM reels r
     LEFT JOIN categories c ON r.category_id = c.id
-    WHERE 1=1
+    WHERE r.created_at >= ? AND r.created_at <= ?
   `;
-  const catParams = [];
+  const catParams = [startStr, endStr];
   if (clientFilter) {
     catSql += " AND r.client_id = ?";
     catParams.push(clientFilter);
   }
-  if (startStr && endStr) {
-    catSql += " AND r.created_at BETWEEN ? AND ?";
-    catParams.push(startStr, endStr);
-  }
   catSql += " GROUP BY category_name ORDER BY count DESC LIMIT 8";
   const [topCategories] = await pool.query(catSql, catParams);
 
-  // 4. Top Creators Leaderboard (Top 5)
+  // 4. Top Creators Leaderboard (Top 5, scoped to resolved date range)
   let topUserSql = `
     SELECT 
       user_id,
@@ -91,16 +125,12 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
       COALESCE(SUM(view_count), 0) AS total_views,
       COALESCE(SUM(like_count), 0) AS total_likes
     FROM reels
-    WHERE 1=1
+    WHERE created_at >= ? AND created_at <= ?
   `;
-  const topUserParams = [];
+  const topUserParams = [startStr, endStr];
   if (clientFilter) {
     topUserSql += " AND client_id = ?";
     topUserParams.push(clientFilter);
-  }
-  if (startStr && endStr) {
-    topUserSql += " AND created_at BETWEEN ? AND ?";
-    topUserParams.push(startStr, endStr);
   }
   topUserSql += " GROUP BY user_id ORDER BY total_views DESC LIMIT 5";
   const [creatorAggs] = await pool.query(topUserSql, topUserParams);
@@ -130,7 +160,7 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
     });
   }
 
-  // 5. Daily uploads trend
+  // 5. Daily uploads trend (scoped to resolved date range)
   let trendSql = `
     SELECT 
       DATE_FORMAT(created_at, '%Y-%m-%d') AS date,
@@ -138,27 +168,21 @@ async function getDashboardStats({ clientId = null, startDate = null, endDate = 
       COUNT(CASE WHEN status IN ('approved', 'published') THEN 1 END) AS approved_count,
       COUNT(CASE WHEN status = 'rejected' THEN 1 END) AS rejected_count
     FROM reels
-    WHERE 1=1
+    WHERE created_at >= ? AND created_at <= ?
   `;
-  const trendParams = [];
+  const trendParams = [startStr, endStr];
   if (clientFilter) {
     trendSql += " AND client_id = ?";
     trendParams.push(clientFilter);
-  }
-  if (startStr && endStr) {
-    trendSql += " AND created_at BETWEEN ? AND ?";
-    trendParams.push(startStr, endStr);
-  } else {
-    trendSql += " AND created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)";
   }
   trendSql += " GROUP BY date ORDER BY date ASC";
   const [dailyUploadsTrend] = await pool.query(trendSql, trendParams);
 
   return {
     date_range: {
-      startDate: startStr ? startStr.slice(0, 10) : new Date().toISOString().slice(0, 10),
-      endDate: endStr ? endStr.slice(0, 10) : new Date().toISOString().slice(0, 10),
-      isFiltered: Boolean(startStr && endStr),
+      startDate: resolvedStartDate,
+      endDate: resolvedEndDate,
+      isFiltered: isFiltered,
     },
     users: userStats[0] || {},
     reels: reelStats[0] || {},

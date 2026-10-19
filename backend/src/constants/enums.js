@@ -70,6 +70,7 @@ const AUDIT_ACTIONS = Object.freeze({
   CATEGORY_CREATED: "category_created",
   CATEGORY_UPDATED: "category_updated",
   MUSIC_BULK_UPLOAD: "music_bulk_upload",
+  MUSIC_DELETED: "music_deleted",
 });
 
 module.exports = {
