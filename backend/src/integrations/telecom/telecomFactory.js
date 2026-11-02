@@ -4,6 +4,7 @@ const DialogSLProvider = require("./providers/dialogsl.provider");
 const OoredooPalestineProvider = require("./providers/ooredoo_palestine.provider");
 const JordanOrangeProvider = require("./providers/jordan_orange.provider");
 const JordanZainProvider = require("./providers/jordan_zain.provider");
+const AsiacellIraqProvider = require("./providers/asiacell_iraq.provider");
 
 function getTelecomProvider(config) {
   if (!config || !config.provider_key) {
@@ -39,6 +40,12 @@ function getTelecomProvider(config) {
     case "ZAJO":
     case "BEECELL_ZAIN":
       return new JordanZainProvider(config);
+    case "ASIACELL_IRAQ":
+    case "ASIACELL":
+    case "ASIACELL_IQ":
+    case "ASIQ":
+    case "BEECELL_ASIACELL":
+      return new AsiacellIraqProvider(config);
     default:
       throw new Error(`Unsupported telecom provider key: ${config.provider_key}`);
   }
